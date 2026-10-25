@@ -8,18 +8,6 @@
     <value value='2' nick='BOTTOM'/>
     <value value='3' nick='LEFT'/>
   </enum>
-    <enum id='org.gnome.shell.extensions.dash-to-dock.running-indicator-style'>
-    <value value='0' nick='DEFAULT'/>
-    <value value='1' nick='DOTS'/>
-    <value value='2' nick='SQUARES'/>
-    <value value='3' nick='DASHES'/>
-    <value value='4' nick='SEGMENTED'/>
-    <value value='5' nick='SOLID'/>
-    <value value='6' nick='CILIORA'/>
-    <value value='7' nick='METRO'/>
-    <value value='8' nick='BINARY'/>
-    <value value='9' nick='DOT'/>
-  </enum>
   <schema path="/org/gnome/shell/extensions/dash-to-dock/" id="org.gnome.shell.extensions.dash-to-dock">
     <key name="dock-position" enum="org.gnome.shell.extensions.dash-to-dock.position">
       <default>'BOTTOM'</default>
@@ -40,11 +28,6 @@
       <default>0.20</default>
       <summary>Show delay</summary>
       <description>Sets the delay after the mouse left the dock before hiding it.</description>
-    </key>
-    <key name="running-indicator-style" enum="org.gnome.shell.extensions.dash-to-dock.running-indicator-style">
-      <default>'DEFAULT'</default>
-      <summary>...</summary>
-      <description>DEFAULT: .... DOTS: ....</description>
     </key>
     <key type="b" name="running-indicator-dominant-color">
       <default>false</default>
@@ -76,11 +59,6 @@
       <summary>Dock always visible</summary>
       <description>Dock is always visible</description>
     </key>
-    <key type="d" name="preview-size-scale">
-      <default>0</default>
-      <summary>Preview size scale</summary>
-      <description>Set the allowed maximum dash preview size scale. Allowed range: 0,00..1,00.</description>
-    </key>
     <key type="b" name="icon-size-fixed">
       <default>false</default>
       <summary>Fixed icon size</summary>
@@ -105,16 +83,6 @@
       <default>true</default>
       <summary>Scroll to focused application</summary>
       <description>Ensure that the focused application icon is always visible in the dash</description>
-    </key>
-    <key type="b" name="show-windows-preview">
-      <default>true</default>
-      <summary>Show preview of the open windows</summary>
-      <description>Replace open windows list with windows previews</description>
-    </key>
-    <key type="b" name="default-windows-preview-to-open">
-      <default>false</default>
-      <summary>Open windows preview by default</summary>
-      <description>Window previews will show windows by default, rather than hide them behind a drop dowm menu.</description>
     </key>
     <key type="b" name="dance-urgent-applications">
       <default>true</default>
@@ -157,21 +125,6 @@
       <default>false</default>
       <summary>Transparent dash background</summary>
       <description>Show the dock without its background.</description>
-    </key>
-    <key name="show-icons-emblems" type="b">
-      <default>true</default>
-      <summary>Show application icons emblems</summary>
-      <description>Show application icons emblems such as notification counters an progress bars.</description>
-    </key>
-    <key name="show-icons-notifications-counter" type="b">
-      <default>true</default>
-      <summary>Show the number of unread notifications in icons</summary>
-      <description>Show application icons emblems such as notification</description>
-    </key>
-    <key name="application-counter-overrides-notifications" type="b">
-      <default>true</default>
-      <summary>Wether the application-provioded counter via Unity API should override the notifications or be summed to it</summary>
-      <description>If an application provides a counter through the Unity API, then such value will be used. Otherwise the counter will be summed with the unread notification numbers (if enabled)</description>
     </key>
   </schema>
 </schemalist>

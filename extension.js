@@ -19,7 +19,6 @@ import * as Workspace from 'resource:///org/gnome/shell/ui/workspace.js';
 import * as WorkspaceSwitcherPopup from 'resource:///org/gnome/shell/ui/workspaceSwitcherPopup.js';
 import * as WorkspacesView from 'resource:///org/gnome/shell/ui/workspacesView.js';
 
-import * as AppIcons from './appIcons.js';
 import * as DockDash from './dash.js';
 import * as Locations from './locations.js';
 import * as Utils from './utils.js';
@@ -1317,30 +1316,7 @@ export class DockManager {
         this._oldDash = Main.overview.isDummy ? null : Main.overview.dash;
         this._signalsHandler.add(this._oldDash, 'destroy', () => (this._oldDash = null));
         this._discreteGpuAvailable = AppDisplay.discreteGpuAvailable;
-        this._notificationsMonitor = new AppIcons.NotificationsMonitor();
         this._windowTracker = Shell.WindowTracker.get_default();
-
-        const needsRemoteModel = () =>
-            !this._notificationsMonitor.dndMode && this._settings.showIconsEmblems;
-
-        const ensureRemoteModel = () => {
-            const shouldHaveRemoteModel = needsRemoteModel();
-            if (shouldHaveRemoteModel && !this._remoteModel) {
-                this._remoteModel = new AppIcons.LauncherEntryRemoteModel();
-                this._appIconsDecorator = new AppIcons.AppIconsDecorator();
-            } else if (!shouldHaveRemoteModel) {
-                this._remoteModel?.destroy();
-                delete this._remoteModel;
-                this._appIconsDecorator?.destroy();
-                delete this._appIconsDecorator;
-            }
-        };
-        ensureRemoteModel();
-
-        this._signalsHandler.add(this._notificationsMonitor, 'state-changed',
-            () => ensureRemoteModel());
-        this._signalsHandler.add(this._settings, 'changed::show-icons-emblems',
-            () => ensureRemoteModel());
 
         if (this._discreteGpuAvailable === undefined) {
             const updateDiscreteGpuAvailable = () => {
@@ -1420,10 +1396,6 @@ export class DockManager {
         return this._fm1Client;
     }
 
-    get remoteModel() {
-        return this._remoteModel;
-    }
-
     get mainDock() {
         return this._allDocks[0] ?? null;
     }
@@ -1434,10 +1406,6 @@ export class DockManager {
 
     get discreteGpuAvailable() {
         return AppDisplay.discreteGpuAvailable || this._discreteGpuAvailable;
-    }
-
-    get notificationsMonitor() {
-        return this._notificationsMonitor;
     }
 
     getDockByMonitor(monitorIndex) {
@@ -2152,12 +2120,9 @@ export class DockManager {
             this._fm1Client.destroy();
             this._fm1Client = null;
         }
-        this._notificationsMonitor.destroy();
         this._removables?.destroy();
         this._removables = null;
         this._iconTheme = null;
-        this._remoteModel?.destroy();
-        this._appIconsDecorator?.destroy();
         this._settings = null;
         this._appSwitcherSettings = null;
         this._windowTracker = null;
@@ -2684,11 +2649,6 @@ export class ThemeManager {
     _updateCustomStyleClasses() {
         const {settings} = DockManager;
 
-        if (settings.runningIndicatorStyle !== 0)
-            this._actor.add_style_class_name('running-dots');
-        else
-            this._actor.remove_style_class_name('running-dots');
-
         if (settings.forceStraightCorner)
             this._actor.add_style_class_name('straight-corner');
         else
@@ -2743,7 +2703,6 @@ export class ThemeManager {
 
     _bindSettingsChanges() {
         const keys = [
-            'running-indicator-style',
             'extend-height',
             'force-straight-corner',
             'transparent-background',

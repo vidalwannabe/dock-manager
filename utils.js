@@ -534,76 +534,6 @@ export function getPosition() {
 }
 
 /**
- * @param cr
- * @param x
- * @param y
- * @param width
- * @param height
- * @param isRoundLeft
- * @param isRoundRight
- * @param stroke
- * @param fill
- */
-export function drawRoundedLine(cr, x, y, width, height, isRoundLeft, isRoundRight, stroke, fill) {
-    if (height > width) {
-        y += Math.floor((height - width) / 2.0);
-        height = width;
-    }
-
-    height = 2.0 * Math.floor(height / 2.0);
-
-    const leftRadius = isRoundLeft ? height / 2.0 : 0.0;
-    const rightRadius = isRoundRight ? height / 2.0 : 0.0;
-
-    cr.moveTo(x + width - rightRadius, y);
-    cr.lineTo(x + leftRadius, y);
-    if (isRoundLeft)
-        cr.arcNegative(x + leftRadius, y + leftRadius, leftRadius, -Math.PI / 2, Math.PI / 2);
-    else
-        cr.lineTo(x, y + height);
-    cr.lineTo(x + width - rightRadius, y + height);
-    if (isRoundRight)
-        cr.arcNegative(x + width - rightRadius, y + rightRadius, rightRadius, Math.PI / 2, -Math.PI / 2);
-    else
-        cr.lineTo(x + width, y);
-    cr.closePath();
-
-    if (fill) {
-        cr.setSource(fill);
-        cr.fillPreserve();
-    }
-    if (stroke)
-        cr.setSource(stroke);
-    cr.stroke();
-}
-
-/**
- * Convert a signal handler with n value parameters (that is, excluding the
- * signal source parameter) to an array of n handlers that are each responsible
- * for receiving one of the n values and calling the original handler with the
- * most up-to-date arguments.
- *
- * @param handler
- */
-export function splitHandler(handler) {
-    if (handler.length > 30)
-        throw new Error('too many parameters');
-
-    const count = handler.length - 1;
-    let missingValueBits = (1 << count) - 1;
-    const values = Array.from({length: count});
-    return values.map((_ignored, i) => {
-        const mask = ~(1 << i);
-        return (obj, value) => {
-            values[i] = value;
-            missingValueBits &= mask;
-            if (missingValueBits === 0)
-                handler(obj, ...values);
-        };
-    });
-}
-
-/**
  * Construct a map of gtk application window object paths to MetaWindows.
  */
 export function getWindowsByObjectPath() {
@@ -809,6 +739,3 @@ export function addActor(element, actor) {
     else
         element.add_child(actor);
 }
-
-export const clamp = (v, m, M) => Math.min(Math.max(v, m), M);
-export const clampDouble = v => clamp(v, 0, 1);

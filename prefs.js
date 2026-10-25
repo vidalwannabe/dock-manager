@@ -56,11 +56,6 @@ export default class DockPreferences extends ExtensionPreferences {
         settings.bind('extend-height', dockSize, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
         group.add(dockSize);
         group.add(switchRow(settings, 'icon-size-fixed', __('Fixed icon size: scroll to reveal other icons')));
-
-        group.add(this._scaleRow(settings, 'preview-size-scale', __('Preview size scale'), {
-            lower: 0, upper: 1, step: 0.01, digits: 2,
-            format: value => value === 0 ? 'auto' : `${value}`,
-        }));
         return group;
     }
 
@@ -141,25 +136,8 @@ export default class DockPreferences extends ExtensionPreferences {
         group.add(isolateWorkspacesRow(settings));
         group.add(switchRow(settings, 'workspace-agnostic-urgent-windows', __('Show urgent windows despite current workspace')));
         group.add(switchRow(settings, 'isolate-monitors', __('Isolate monitors')));
-        group.add(switchRow(settings, 'show-windows-preview', __('Show open windows\' previews')));
         group.add(switchRow(settings, 'scroll-to-focused-application', __('Keep the focused application always visible in the dash')));
         group.add(switchRow(settings, 'dance-urgent-applications', __('Wiggle urgent applications')));
-
-        group.add(switchRow(settings, 'show-icons-emblems', __('Show icons emblems'),
-            __('When enabled application icons will show notification counters and progress-bars (if Unity API is used).')));
-        const counter = switchRow(settings, 'show-icons-notifications-counter', __('Show the number of unread notifications'));
-        settings.bind('show-icons-emblems', counter, 'sensitive', Gio.SettingsBindFlags.GET);
-        group.add(counter);
-        const override = switchRow(settings, 'application-counter-overrides-notifications',
-            __('Application-provided counter overrides the notifications counter'));
-        const syncOverride = () => {
-            override.sensitive = settings.get_boolean('show-icons-emblems') &&
-                settings.get_boolean('show-icons-notifications-counter');
-        };
-        settings.connect('changed::show-icons-emblems', syncOverride);
-        settings.connect('changed::show-icons-notifications-counter', syncOverride);
-        syncOverride();
-        group.add(override);
         return group;
     }
 
@@ -174,18 +152,7 @@ export default class DockPreferences extends ExtensionPreferences {
         settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
         group.add(centerIcons);
 
-        const indicators = enumChoice(settings, 'running-indicator-style', __('Customize windows counter indicators'), [
-            __('Default'), __('Dots'), __('Squares'), __('Dashes'), __('Segmented'),
-            __('Solid'), __('Ciliora'), __('Metro'), __('Binary'), __('Dot'),
-        ]);
-        group.add(indicators);
-
-        // Dominant color, for any style but Default.
-        const dominant = switchRow(settings, 'running-indicator-dominant-color', __('Use dominant color'));
-        const syncDominant = () => (dominant.visible = settings.get_enum('running-indicator-style') !== 0);
-        settings.connect('changed::running-indicator-style', syncDominant);
-        syncDominant();
-        group.add(dominant);
+        group.add(switchRow(settings, 'running-indicator-dominant-color', __('Use dominant color for the running dots')));
         return group;
     }
 }
@@ -203,18 +170,6 @@ function spinRow(settings, key, title, lower, upper, step, digits) {
     row.title = title;
     row.digits = digits;
     settings.bind(key, row, 'value', Gio.SettingsBindFlags.DEFAULT);
-    return row;
-}
-
-// A choice bound to an enum setting whose values are 0, 1, 2... in the order of `labels`.
-function enumChoice(settings, key, title, labels) {
-    const row = new Adw.ComboRow({title, model: Gtk.StringList.new(labels)});
-    row.selected = settings.get_enum(key);
-    row.connect('notify::selected', () => {
-        if (row.selected !== settings.get_enum(key))
-            settings.set_enum(key, row.selected);
-    });
-    settings.connect(`changed::${key}`, () => (row.selected = settings.get_enum(key)));
     return row;
 }
 

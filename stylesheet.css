@@ -243,20 +243,6 @@
   -y-offset: 0;
 }
 
-.dashtodock-app-well-preview-menu-item.bottom {
-  padding: 0.5em 0.5em;
-}
-
-.dashtodock-app-well-preview-menu-item.bottom:ltr:first-child,
-.dashtodock-app-well-preview-menu-item.bottom:rtl:last-child {
-  padding-left: 1em;
-}
-
-.dashtodock-app-well-preview-menu-item.bottom:ltr:last-child,
-.dashtodock-app-well-preview-menu-item.bottom:rtl:first-child {
-  padding-right: 1em;
-}
-
 #dashtodockContainer.top #dash {
   margin: 0px;
   padding: 0px;
@@ -491,20 +477,6 @@
   -y-offset: 0;
 }
 
-.dashtodock-app-well-preview-menu-item.top {
-  padding: 0.5em 0.5em;
-}
-
-.dashtodock-app-well-preview-menu-item.top:ltr:first-child,
-.dashtodock-app-well-preview-menu-item.top:rtl:last-child {
-  padding-left: 1em;
-}
-
-.dashtodock-app-well-preview-menu-item.top:ltr:last-child,
-.dashtodock-app-well-preview-menu-item.top:rtl:first-child {
-  padding-right: 1em;
-}
-
 #dashtodockContainer.left #dash {
   margin: 0px;
   padding: 0px;
@@ -717,18 +689,6 @@
   margin: 0;
   -x-offset: 10px;
   -y-offset: 0;
-}
-
-.dashtodock-app-well-preview-menu-item.left {
-  padding: 0.5em 0.5em;
-}
-
-.dashtodock-app-well-preview-menu-item.left:first-child {
-  padding-top: 1em;
-}
-
-.dashtodock-app-well-preview-menu-item.left:last-child {
-  padding-bottom: 1em;
 }
 
 #dashtodockContainer.right #dash {
@@ -945,18 +905,6 @@
   -y-offset: 0;
 }
 
-.dashtodock-app-well-preview-menu-item.right {
-  padding: 0.5em 0.5em;
-}
-
-.dashtodock-app-well-preview-menu-item.right:first-child {
-  padding-top: 1em;
-}
-
-.dashtodock-app-well-preview-menu-item.right:last-child {
-  padding-bottom: 1em;
-}
-
 .bottom #dashtodockDashScrollview,
 .top #dashtodockDashScrollview {
   -st-hfade-offset: 24px;
@@ -967,38 +915,10 @@
   -st-vfade-offset: 24px;
 }
 
-#overview .progress-bar,
-.apps-scroll-view .progress-bar {
-  -progress-bar-height-factor: 0.15;
-  -progress-bar-top-offset: 0;
-  -progress-bar-valign: 0.95;
-}
-
-#overview .grid-search-results .overview-tile .progress-bar,
-#overview .app-folder-dialog .progress-bar {
-  -progress-bar-height-factor: 0.13;
-}
-
 #dashtodockContainer.top #dash .placeholder,
 #dashtodockContainer.bottom #dash .placeholder {
   width: 32px;
   height: 1px;
-}
-
-#dashtodockContainer .notification-badge,
-.overview-tile .notification-badge,
-.icon-grid .notification-badge {
-  padding: 0.2em 0.5em;
-  font-weight: bold;
-  text-align: center;
-  margin: 2px;
-}
-
-#dashtodockPreviewSeparator.popup-separator-menu-item-horizontal {
-  width: 1px;
-  height: auto;
-  border-right-width: 1px;
-  margin: 32px 0px;
 }
 
 #dashtodockContainer.straight-corner #dash .dash-background {
