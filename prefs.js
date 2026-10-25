@@ -207,8 +207,6 @@ export default class DockPreferences extends ExtensionPreferences {
 
         // Options of the indicators, for any style but Default.
         const backlit = switchRow(settings, 'unity-backlit-items', __('Enable Unity7 like glossy backlit items'));
-        const glossy = switchRow(settings, 'apply-glossy-effect', __('Apply glossy effect.'));
-        settings.bind('unity-backlit-items', glossy, 'sensitive', Gio.SettingsBindFlags.GET);
         const dominant = switchRow(settings, 'running-indicator-dominant-color', __('Use dominant color'));
         const customize = switchRow(settings, 'custom-theme-customize-running-dots', __('Customize indicator style'));
         const dotColor = colorRow(settings, 'custom-theme-running-dots-color', __('Color'));
@@ -217,7 +215,7 @@ export default class DockPreferences extends ExtensionPreferences {
         for (const row of [dotColor, borderColor, borderWidth])
             settings.bind('custom-theme-customize-running-dots', row, 'sensitive', Gio.SettingsBindFlags.GET);
 
-        const options = [backlit, glossy, dominant, customize, dotColor, borderColor, borderWidth];
+        const options = [backlit, dominant, customize, dotColor, borderColor, borderWidth];
         const syncOptions = () => {
             const styled = settings.get_enum('running-indicator-style') !== 0;
             options.forEach(row => (row.visible = styled));

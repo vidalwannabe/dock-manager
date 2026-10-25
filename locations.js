@@ -1,37 +1,71 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
-import {
-    Gio,
-    GioUnix,
-    GLib,
-    GObject,
-    Shell,
-    St,
-} from './dependencies/gi.js';
+import Gio from 'gi://Gio';
+import GioUnix from 'gi://GioUnix';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
+import Shell from 'gi://Shell';
+import St from 'gi://St';
 
-import {ShellMountOperation} from './dependencies/shell/ui.js';
+import * as Extension from 'resource:///org/gnome/shell/extensions/extension.js';
+import * as ShellMountOperation from 'resource:///org/gnome/shell/ui/shellMountOperation.js';
 
-import {
-    Docking,
-    Utils,
-} from './imports.js';
+import * as Docking from './extension.js';
+import * as Utils from './utils.js';
 
-import {Extension} from './dependencies/shell/extensions/extension.js';
-
-// Use __ () and N__() for the extension gettext domain, and reuse
-// the shell domain with the default _() and N_()
+// Use __() and N__() for the extension gettext domain, and the shell domain with _() and N_().
 const {gettext: __} = Extension;
-
 const {signals: Signals} = imports;
+
+const Labels = Object.freeze({
+    LOCATION_WINDOWS: Symbol('location-windows'),
+    WINDOWS: Symbol('windows'),
+});
 
 const FALLBACK_REMOVABLE_MEDIA_ICON = 'drive-removable-media';
 const FILE_MANAGER_DESKTOP_APP_ID = 'org.gnome.Nautilus.desktop';
 const ATTRIBUTE_METADATA_CUSTOM_ICON = 'metadata::custom-icon';
 const LAUNCH_HANDLER_MAX_WAIT = 200;
 
-const Labels = Object.freeze({
-    LOCATION_WINDOWS: Symbol('location-windows'),
+// Run by a separate gjs process (gjs -c HANDLER_WORKER <uri> <timeout>), since GVfs providers
+// could hang when querying a location: the shell waits for it, but never longer than the timeout.
+// It prints the id of the app that opens the location, or exits with the Gio.IOErrorEnum code
+// of the failure.
+const HANDLER_WORKER = `
+const {GLib, Gio} = imports.gi;
+const [uri, timeout] = ARGV;
+const location = Gio.File.new_for_uri(uri);
+const cancellable = new Gio.Cancellable();
+const loop = new GLib.MainLoop(null, false);
+let exitCode = 0;
+let timedOut = false;
+
+const timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Number(timeout), () => {
+    timedOut = true;
+    cancellable.cancel();
+    return GLib.SOURCE_REMOVE;
 });
+
+location.query_default_handler_async(GLib.PRIORITY_DEFAULT, cancellable, (file, result) => {
+    try {
+        print(file.query_default_handler_finish(result).get_id());
+        GLib.source_remove(timeoutId);
+    } catch (e) {
+        if (timedOut) {
+            printerr('Searching for ' + uri + ' handler took too long');
+            exitCode = Gio.IOErrorEnum.TIMED_OUT;
+        } else {
+            GLib.source_remove(timeoutId);
+            printerr(e.message);
+            exitCode = e.code || GLib.MAXUINT8;
+        }
+    }
+    loop.quit();
+});
+
+loop.run();
+imports.system.exit(exitCode);
+`;
 
 const GJS_SUPPORTS_FILE_IFACE_PROMISES = imports.system.version >= 17101;
 
@@ -39,7 +73,6 @@ if (GJS_SUPPORTS_FILE_IFACE_PROMISES) {
     Gio._promisify(Gio.File.prototype, 'query_info_async');
     Gio._promisify(Gio.File.prototype, 'query_default_handler_async');
 }
-
 
 export const LocationAppInfo = GObject.registerClass({
     Implements: [Gio.AppInfo],
@@ -299,13 +332,8 @@ export const LocationAppInfo = GObject.registerClass({
     }
 
     _getHandlerAppFromWorker(cancellable) {
-        const locationsWorker = GLib.build_filenamev([
-            Docking.DockManager.extension.path,
-            'locationsWorker.js',
-        ]);
-        const locationsWorkerArgs = [LocationAppInfo.GJS_BINARY_PATH, '-m',
-            locationsWorker, 'handler', this.location.get_uri(),
-            '--timeout', `${LAUNCH_HANDLER_MAX_WAIT}`];
+        const locationsWorkerArgs = [LocationAppInfo.GJS_BINARY_PATH, '-c', HANDLER_WORKER,
+            this.location.get_uri(), `${LAUNCH_HANDLER_MAX_WAIT}`];
         const subProcess = Gio.Subprocess.new(locationsWorkerArgs,
             Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
 
@@ -319,7 +347,6 @@ export const LocationAppInfo = GObject.registerClass({
                 const errorLines = textDecoder.decode(stdErr.toArray()).split('\n');
                 const error = new GLib.Error(Gio.IOErrorEnum,
                     errorCode === GLib.MAXUINT8 ? 0 : errorCode, errorLines[0]);
-                error.stack = `${errorLines.slice(3).join('\n')}${error.stack}`;
                 throw error;
             }
 
@@ -1184,3 +1211,196 @@ export class Removables {
     }
 }
 Signals.addSignalMethods(Removables.prototype);
+
+// ---------- FileManager1 API ----------
+
+const FileManager1Iface = '<node><interface name="org.freedesktop.FileManager1">\
+                               <property name="OpenWindowsWithLocations" type="a{sas}" access="read"/>\
+                           </interface></node>';
+
+const FileManager1Proxy = Gio.DBusProxy.makeProxyWrapper(FileManager1Iface);
+
+/**
+ * This class implements a client for the org.freedesktop.FileManager1 dbus
+ * interface, and specifically for the OpenWindowsWithLocations property
+ * which is published by Nautilus, but is not an official part of the interface.
+ *
+ * The property is a map from window identifiers to a list of locations open in
+ * the window.
+ */
+export class FileManager1Client {
+    constructor() {
+        this._signalsHandler = new Utils.GlobalSignalsHandler();
+        this._cancellable = new Gio.Cancellable();
+
+        this._windowsByPath = new Map();
+        this._windowsByLocation = new Map();
+        this._proxy = new FileManager1Proxy(Gio.DBus.session,
+            'org.freedesktop.FileManager1',
+            '/org/freedesktop/FileManager1',
+            (initable, error) => {
+            // Use async construction to avoid blocking on errors.
+                if (error) {
+                    if (!error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                        global.log(error);
+                } else {
+                    this._updateWindows();
+                    this._updateLocationMap();
+                }
+            }, this._cancellable);
+
+        this._signalsHandler.add([
+            this._proxy,
+            'g-properties-changed',
+            this._onPropertyChanged.bind(this),
+        ], [
+            // We must additionally listen for Screen events to know when to
+            // rebuild our location map when the set of available windows changes.
+            global.workspaceManager,
+            'workspace-added',
+            () => this._onWindowsChanged(),
+        ], [
+            global.workspaceManager,
+            'workspace-removed',
+            () => this._onWindowsChanged(),
+        ], [
+            global.display,
+            'window-entered-monitor',
+            () => this._onWindowsChanged(),
+        ], [
+            global.display,
+            'window-left-monitor',
+            () => this._onWindowsChanged(),
+        ]);
+    }
+
+    destroy() {
+        if (this._windowsUpdateIdle) {
+            GLib.source_remove(this._windowsUpdateIdle);
+            delete this._windowsUpdateIdle;
+        }
+        this._cancellable.cancel();
+        this._signalsHandler.destroy();
+        this._windowsByLocation.clear();
+        this._windowsByPath.clear();
+        this._proxy = null;
+    }
+
+    /**
+     * Return an array of windows that are showing a location or
+     * sub-directories of that location.
+     *
+     * @param location
+     */
+    getWindows(location) {
+        if (!location)
+            return [];
+
+        location += location.endsWith('/') ? '' : '/';
+        const windows = [];
+        this._windowsByLocation.forEach((wins, l) => {
+            if (l.startsWith(location))
+                windows.push(...wins);
+        });
+        return [...new Set(windows)];
+    }
+
+    _onPropertyChanged(proxy, changed, _invalidated) {
+        const property = changed.unpack();
+        if (property &&
+            ('OpenWindowsWithLocations' in property))
+            this._updateLocationMap();
+    }
+
+    _updateWindows() {
+        const oldSize = this._windowsByPath.size;
+        const oldPaths = this._windowsByPath.keys();
+        this._windowsByPath = Utils.getWindowsByObjectPath();
+
+        if (oldSize !== this._windowsByPath.size)
+            return true;
+
+        return [...oldPaths].some(path => !this._windowsByPath.has(path));
+    }
+
+    _onWindowsChanged() {
+        if (this._windowsUpdateIdle)
+            return;
+
+        this._windowsUpdateIdle = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            if (this._updateWindows())
+                this._updateLocationMap();
+
+            delete this._windowsUpdateIdle;
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _updateLocationMap() {
+        const properties = this._proxy.get_cached_property_names();
+        if (!properties) {
+            // Nothing to check yet.
+            return;
+        }
+
+        if (properties.includes('OpenWindowsWithLocations'))
+            this._updateFromPaths();
+    }
+
+    _locationMapsEquals(mapA, mapB) {
+        if (mapA.size !== mapB.size)
+            return false;
+
+        const setsEquals = (a, b) => a.size === b.size &&
+            [...a].every(value => b.has(value));
+
+        for (const [key, val] of mapA) {
+            const windowsSet = mapB.get(key);
+            if (!windowsSet || !setsEquals(windowsSet, val))
+                return false;
+        }
+        return true;
+    }
+
+    _updateFromPaths() {
+        const locationsByWindowsPath = this._proxy.OpenWindowsWithLocations;
+
+        const windowsByLocation = new Map();
+        this._signalsHandler.removeWithLabel(Labels.WINDOWS);
+
+        Object.entries(locationsByWindowsPath).forEach(([windowPath, locations]) => {
+            locations.forEach(location => {
+                const win = this._windowsByPath.get(windowPath);
+                const windowGroup = win ? [win] : [];
+
+                win?.foreach_transient(w => windowGroup.push(w) || true);
+
+                windowGroup.forEach(window => {
+                    location += location.endsWith('/') ? '' : '/';
+                    // Use a set to deduplicate when a window has a
+                    // location open in multiple tabs.
+                    const windows = windowsByLocation.get(location) || new Set();
+                    windows.add(window);
+
+                    if (windows.size === 1)
+                        windowsByLocation.set(location, windows);
+
+                    this._signalsHandler.addWithLabel(Labels.WINDOWS, window,
+                        'unmanaged', () => {
+                            const wins = this._windowsByLocation.get(location);
+                            wins.delete(window);
+                            if (!wins.size)
+                                this._windowsByLocation.delete(location);
+                            this.emit('windows-changed');
+                        });
+                });
+            });
+        });
+
+        if (!this._locationMapsEquals(this._windowsByLocation, windowsByLocation)) {
+            this._windowsByLocation = windowsByLocation;
+            this.emit('windows-changed');
+        }
+    }
+}
+Signals.addSignalMethods(FileManager1Client.prototype);

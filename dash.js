@@ -1,43 +1,33 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
-import {
-    Clutter,
-    Gio,
-    GLib,
-    GObject,
-    Shell,
-    St,
-} from './dependencies/gi.js';
+import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
+import Shell from 'gi://Shell';
+import St from 'gi://St';
 
-import {
-    AppFavorites,
-    Dash,
-    DND,
-    Main,
-} from './dependencies/shell/ui.js';
+import * as Config from 'resource:///org/gnome/shell/misc/config.js';
+import * as Util from 'resource:///org/gnome/shell/misc/util.js';
+import * as AppFavorites from 'resource:///org/gnome/shell/ui/appFavorites.js';
+import * as Dash from 'resource:///org/gnome/shell/ui/dash.js';
+import * as DND from 'resource:///org/gnome/shell/ui/dnd.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {
-    Config,
-    Util,
-} from './dependencies/shell/misc.js';
+import * as AppIcons from './appIcons.js';
+import * as Docking from './extension.js';
+import * as Utils from './utils.js';
 
-import {
-    AppIcons,
-    Docking,
-    Theming,
-    Utils,
-} from './imports.js';
+const Labels = Object.freeze({
+    SHOW_MOUNTS: Symbol('show-mounts'),
+    FIRST_LAST_CHILD_WORKAROUND: Symbol('first-last-child-workaround'),
+});
 
 // module "Dash" did not export DASH_ANIMATION_TIME in old versions
 // so we just define it like it is defined in Dash;
 // taken from https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/dash.js
 const DASH_ANIMATION_TIME = Dash.DASH_ANIMATION_TIME ?? 200;
 const DASH_VISIBILITY_TIMEOUT = 3;
-
-const Labels = Object.freeze({
-    SHOW_MOUNTS: Symbol('show-mounts'),
-    FIRST_LAST_CHILD_WORKAROUND: Symbol('first-last-child-workaround'),
-});
 
 /**
  * Extend DashItemContainer
@@ -55,7 +45,7 @@ class DockDashItemContainer extends Dash.DashItemContainer {
         else
             this.yExpand = false;
 
-        this.label?.add_style_class_name(Theming.PositionStyleClass[position]);
+        this.label?.add_style_class_name(Docking.PositionStyleClass[position]);
     }
 
     showLabel() {
@@ -99,7 +89,6 @@ const DockDashIconsVerticalLayout = GObject.registerClass(
             return [natHeight, 0];
         }
     });
-
 
 const baseIconSizes = [16, 22, 24, 32, 48, 64, 96, 128];
 
@@ -193,7 +182,7 @@ export const DockDash = GObject.registerClass({
             x_align: Clutter.ActorAlign.FILL,
             y_align: Clutter.ActorAlign.FILL,
         });
-        this._boxContainer.add_style_class_name(Theming.PositionStyleClass[this._position]);
+        this._boxContainer.add_style_class_name(Docking.PositionStyleClass[this._position]);
 
         const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
         this._box = new St.BoxLayout({
@@ -352,7 +341,6 @@ export const DockDash = GObject.registerClass({
         }
     }
 
-
     _onItemDragBegin(...args) {
         return Dash.Dash.prototype._onItemDragBegin.call(this, ...args);
     }
@@ -481,7 +469,6 @@ export const DockDash = GObject.registerClass({
         // Skip to avoid double events mouse
         if (event.get_scroll_direction() !== Clutter.ScrollDirection.SMOOTH)
             return Clutter.EVENT_STOP;
-
 
         let adjustment, delta = 0;
 
@@ -1105,7 +1092,6 @@ export const DockDash = GObject.registerClass({
         }
     }
 });
-
 
 /**
  * This is a copy of the same function in utils.js, but also adjust horizontal scrolling

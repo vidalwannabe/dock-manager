@@ -1,16 +1,14 @@
-import {
-    Clutter,
-    GLib,
-    Gio,
-    GObject,
-    Meta,
-    Shell,
-    St,
-} from './dependencies/gi.js';
+// -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
-import {
-    Docking,
-} from './imports.js';
+import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
+import St from 'gi://St';
+
+import * as Docking from './extension.js';
 
 // Dash to dock supports replacing vfuncs in GObject classes and we need
 // this to monkey them.
