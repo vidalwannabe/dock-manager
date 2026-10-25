@@ -12,7 +12,6 @@ import * as Extension from 'resource:///org/gnome/shell/extensions/extension.js'
 import * as AnimationUtils from 'resource:///org/gnome/shell/misc/animationUtils.js';
 import * as AppDisplay from 'resource:///org/gnome/shell/ui/appDisplay.js';
 import * as AppMenu from 'resource:///org/gnome/shell/ui/appMenu.js';
-import * as Layout from 'resource:///org/gnome/shell/ui/layout.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as OverviewControls from 'resource:///org/gnome/shell/ui/overviewControls.js';
 import * as SwitcherPopup from 'resource:///org/gnome/shell/ui/switcherPopup.js';
@@ -254,12 +253,6 @@ const DockedDash = GObject.registerClass({
         this._staticBox = new Clutter.ActorBox();
         this._staticBoxGeometry = null;
 
-        // Initialize pressure barrier variables
-        this._canUsePressure = false;
-        this._pressureBarrier = null;
-        this._barrier = null;
-        this._removeBarrierTimeoutId = 0;
-
         // Initialize dwelling system variables
         this._dockDwelling = false;
         this._dockWatch = null;
@@ -476,7 +469,7 @@ const DockedDash = GObject.registerClass({
         if (Main.overview.visibleTarget)
             this._onOverviewShowing();
 
-        this._updateAutoHideBarriers();
+        this._updateEdgeDwell();
     }
 
     _onDestroy() {
@@ -494,15 +487,6 @@ const DockedDash = GObject.registerClass({
 
         if (this._triggerTimeoutId)
             GLib.source_remove(this._triggerTimeoutId);
-
-        // Remove barrier timeout
-        if (this._removeBarrierTimeoutId > 0) {
-            GLib.source_remove(this._removeBarrierTimeoutId);
-            delete this._removeBarrierTimeoutId;
-        }
-
-        // Remove existing barrier
-        this._removeBarrier();
 
         this._removeDockWatch();
         this._cancelDockDwell();
@@ -549,14 +533,8 @@ const DockedDash = GObject.registerClass({
         });
     }
 
-    _updateAutoHideBarriers() {
+    _updateEdgeDwell() {
         this._removeDockWatch();
-
-        // Setup pressure barrier (GS38+ only)
-        this._updatePressureBarrier();
-        this._updateBarrier();
-
-        // setup dwelling system if pressure barriers are not available
         this._setupDockDwellIfNeeded();
     }
 
@@ -564,22 +542,8 @@ const DockedDash = GObject.registerClass({
         const {settings} = DockManager;
         this._signalsHandler.addWithLabel(Labels.DOCKED_DASH_GLOBAL_SIGNALS, [
             settings,
-            'changed::dash-max-icon-size',
-            () => {
-                this.dash.setIconSize(settings.dashMaxIconSize);
-            },
-        ], [
-            settings,
             'changed::icon-size-fixed',
-            () => {
-                this.dash.setIconSize(settings.dashMaxIconSize);
-            },
-        ], [
-            settings,
-            'changed::show-favorites',
-            () => {
-                this.dash.resetAppIcons();
-            },
+            () => this.dash.updateIconSize(),
         ], [
             settings,
             'changed::dance-urgent-applications',
@@ -587,18 +551,12 @@ const DockedDash = GObject.registerClass({
             Utils.SignalsHandlerFlags.CONNECT_AFTER,
         ], [
             settings,
-            'changed::show-running',
-            () => {
-                this.dash.resetAppIcons();
-            },
-        ], [
-            settings,
             'changed::dock-fixed',
             () => {
                 this._untrackDock();
                 this._trackDock();
 
-                this._updateAutoHideBarriers();
+                this._updateEdgeDwell();
                 this._updateVisibilityMode();
             },
         ], [
@@ -609,27 +567,11 @@ const DockedDash = GObject.registerClass({
             },
         ], [
             settings,
-            'changed::intellihide',
-            () => {
-                this._updateVisibilityMode();
-            },
-        ], [
-            settings,
-            'changed::intellihide-mode',
-            () => {
-                this._intellihide.forceUpdate();
-            },
-        ], [
-            settings,
             'changed::autohide',
             () => {
                 this._updateVisibilityMode();
-                this._updateAutoHideBarriers();
+                this._updateEdgeDwell();
             },
-        ], [
-            settings,
-            'changed::autohide-in-fullscreen',
-            this._updateBarrier.bind(this),
         ], [
             settings,
             'changed::show-dock-urgent-notify',
@@ -649,17 +591,6 @@ const DockedDash = GObject.registerClass({
             settings,
             'changed::always-center-icons',
             () => this.dash.resetAppIcons(),
-        ], [
-            settings,
-            'changed::require-pressure-to-show',
-            () => this._updateAutoHideBarriers(),
-        ], [
-            settings,
-            'changed::pressure-threshold',
-            () => {
-                this._updatePressureBarrier();
-                this._updateBarrier();
-            },
         ]);
     }
 
@@ -691,7 +622,7 @@ const DockedDash = GObject.registerClass({
             this.intellihideEnabled = false;
         } else {
             this.autohideEnabled = settings.autohide;
-            this.intellihideEnabled = settings.intellihide;
+            this.intellihideEnabled = true;
         }
 
         this.updateDashVisibility();
@@ -839,22 +770,8 @@ const DockedDash = GObject.registerClass({
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
                 this.dockState = State.SHOWN;
-                // Remove barrier so that mouse pointer is released and can
-                // monitors on other side of dock.
-                // NOTE: Delay needed to keep mouse from moving past dock and
-                // re-hiding dock immediately. This gives users an opportunity
-                // to hover over the dock
-                if (this._removeBarrierTimeoutId > 0) {
-                    GLib.source_remove(this._removeBarrierTimeoutId);
-                    this._removeBarrierTimeoutId = 0;
-                }
-
-                if (!this._delayedHide) {
-                    this._removeBarrierTimeoutId = GLib.timeout_add(
-                        GLib.PRIORITY_DEFAULT, 100, this._removeBarrier.bind(this));
-                } else {
+                if (this._delayedHide)
                     this.hideDock();
-                }
             },
         });
     }
@@ -871,28 +788,17 @@ const DockedDash = GObject.registerClass({
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
                 this.dockState = State.HIDDEN;
-
-                // Remove queued barrier removal timeout if any
-                if (this._removeBarrierTimeoutId > 0) {
-                    GLib.source_remove(this._removeBarrierTimeoutId);
-                    this._removeBarrierTimeoutId = 0;
-                }
-
-                this._updateBarrier();
                 this.dash.iconAnimator.pause();
             },
         });
     }
 
     /**
-     * Dwelling system based on the GNOME Shell 3.14 messageTray code.
+     * Dwelling system based on the GNOME Shell 3.14 messageTray code: the dock shows when the
+     * pointer rests on the screen edge.
      */
     _setupDockDwellIfNeeded() {
-        // If we don't have extended barrier features, then we need
-        // to support the old tray dwelling mechanism.
-        if (this.autohideEnabled &&
-            (!Utils.supportsExtendedBarriers() ||
-             !DockManager.settings.requirePressureToShow)) {
+        if (this.autohideEnabled) {
             this._dockWatch = Utils.getCursorTracker().connect(
                 'position-invalidated',
                 () => this._checkDockDwellLater(...global.get_pointer()));
@@ -984,8 +890,7 @@ const DockedDash = GObject.registerClass({
         if (currentUserTime !== this._dockDwellUserTime)
             return GLib.SOURCE_REMOVE;
 
-        // Reuse the pressure version function, the logic is the same
-        this._onPressureSensed();
+        this._onEdgeDwelled();
         return GLib.SOURCE_REMOVE;
     }
 
@@ -1001,41 +906,10 @@ const DockedDash = GObject.registerClass({
         }
     }
 
-    _updatePressureBarrier() {
-        const {settings} = DockManager;
-        this._canUsePressure = Utils.supportsExtendedBarriers();
-        const {pressureThreshold} = settings;
-
-        // Remove existing pressure barrier
-        if (this._pressureBarrier) {
-            this._pressureBarrier.disconnectObject(this);
-            this._pressureBarrier.destroy();
-            this._pressureBarrier = null;
-        }
-
-        if (this._barrier) {
-            this._barrier.destroy();
-            this._barrier = null;
-        }
-
-        // Create new pressure barrier based on pressure threshold setting
-        if (this._canUsePressure && this.autohideEnabled &&
-            DockManager.settings.requirePressureToShow) {
-            this._pressureBarrier = new Layout.PressureBarrier(
-                pressureThreshold, settings.showDelay * 1000,
-                Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW);
-            this._pressureBarrier.connectObject('trigger', () => {
-                if (!settings.autohideInFullscreen && this._monitor.inFullscreen)
-                    return;
-                this._onPressureSensed();
-            }, this);
-        }
-    }
-
     /**
-     * handler for mouse pressure sensed
+     * handler for the pointer resting on the screen edge
      */
-    _onPressureSensed() {
+    _onEdgeDwelled() {
         if (Main.overview.visibleTarget)
             return;
 
@@ -1092,91 +966,6 @@ const DockedDash = GObject.registerClass({
         this.showDock();
     }
 
-    /**
-     * Remove pressure barrier
-     */
-    _removeBarrier() {
-        if (this._barrier) {
-            if (this._pressureBarrier)
-                this._pressureBarrier.removeBarrier(this._barrier);
-            this._barrier.destroy();
-            this._barrier = null;
-        }
-        this._removeBarrierTimeoutId = 0;
-        return false;
-    }
-
-    /**
-     * Update pressure barrier size
-     */
-    _updateBarrier() {
-        // Remove existing barrier
-        this._removeBarrier();
-
-        // The barrier needs to be removed in fullscreen with autohide disabled
-        // otherwise the mouse can get trapped on monitor.
-        if (this._monitor.inFullscreen &&
-            !DockManager.settings.autohideInFullscreen)
-            return;
-
-        // Manually reset pressure barrier
-        // This is necessary because we remove the pressure barrier when it is
-        // triggered to show the dock
-        if (this._pressureBarrier) {
-            this._pressureBarrier._reset();
-            this._pressureBarrier._isTriggered = false;
-        }
-
-        // Create new barrier
-        // The barrier extends to the whole workarea, minus 1 px to avoid
-        // conflicting with other active corners
-        // Note: dash in fixed position doesn't use pressure barrier.
-        if (this._canUsePressure && this.autohideEnabled &&
-            DockManager.settings.requirePressureToShow) {
-            let x1, x2, y1, y2, direction;
-            const workArea = Main.layoutManager.getWorkAreaForMonitor(
-                this._monitor.index);
-
-            if (this._position === St.Side.LEFT) {
-                x1 = this._monitor.x + 1;
-                x2 = x1;
-                y1 = workArea.y + 1;
-                y2 = workArea.y + workArea.height - 1;
-                direction = Meta.BarrierDirection.POSITIVE_X;
-            } else if (this._position === St.Side.RIGHT) {
-                x1 = this._monitor.x + this._monitor.width - 1;
-                x2 = x1;
-                y1 = workArea.y + 1;
-                y2 = workArea.y + workArea.height - 1;
-                direction = Meta.BarrierDirection.NEGATIVE_X;
-            } else if (this._position === St.Side.TOP) {
-                x1 = workArea.x + 1;
-                x2 = workArea.x + workArea.width - 1;
-                y1 = this._monitor.y;
-                y2 = y1;
-                direction = Meta.BarrierDirection.POSITIVE_Y;
-            } else if (this._position === St.Side.BOTTOM) {
-                x1 = workArea.x + 1;
-                x2 = workArea.x + workArea.width - 1;
-                y1 = this._monitor.y + this._monitor.height;
-                y2 = y1;
-                direction = Meta.BarrierDirection.NEGATIVE_Y;
-            }
-
-            if (this._pressureBarrier && this.dockState === State.HIDDEN) {
-                this._barrier = new Meta.Barrier({
-                    backend: global.backend,
-                    x1,
-                    x2,
-                    y1,
-                    y2,
-                    directions: direction,
-                });
-                this._pressureBarrier.addBarrier(this._barrier);
-            }
-        }
-    }
-
     _isPrimaryMonitor() {
         return this.monitorIndex === Main.layoutManager.primaryIndex;
     }
@@ -1185,7 +974,7 @@ const DockedDash = GObject.registerClass({
         super.vfunc_map();
 
         this._bindSettingsChanges();
-        this.dash.setIconSize(DockManager.settings.dashMaxIconSize);
+        this.dash.updateIconSize();
 
         this._signalsHandler.addWithLabel(Labels.DOCKED_DASH_GLOBAL_SIGNALS, [
             // update when workarea changes, for instance if  other extensions modify the struts
@@ -1193,10 +982,6 @@ const DockedDash = GObject.registerClass({
             global.display,
             'workareas-changed',
             () => this._resetPosition(),
-        ], [
-            global.display,
-            'in-fullscreen-changed',
-            () => this._updateBarrier(),
         ]);
 
         this._resetPosition();
@@ -2515,13 +2300,6 @@ const OverlapStatus = Object.freeze({
     TRUE: 1,
 });
 
-const IntellihideMode = Object.freeze({
-    ALL_WINDOWS: 0,
-    FOCUS_APPLICATION_WINDOWS: 1,
-    MAXIMIZED_WINDOWS: 2,
-    ALWAYS_ON_TOP: 3,
-});
-
 // List of windows type taken into account. Order is important (keep the original
 // enum order).
 const handledWindowTypes = [
@@ -2748,50 +2526,26 @@ export class Intellihide {
         const workspace = metaWin.get_workspace();
         const workspaceIndex = workspace.index();
 
-        // Depending on the intellihide mode, exclude non-relevent windows
-        switch (DockManager.settings.intellihideMode) {
-        case IntellihideMode.ALL_WINDOWS:
-            // Do nothing
-            break;
+        // Skip windows of other apps
+        if (this._focusApp) {
+            // The DropDownTerminal extension is not an application per se
+            // so we match its window by wm class instead
+            if (metaWin.get_wm_class() === 'DropDownTerminalWindow')
+                return true;
 
-        case IntellihideMode.FOCUS_APPLICATION_WINDOWS:
-            // Skip windows of other apps
-            if (this._focusApp) {
-                // The DropDownTerminal extension is not an application per se
-                // so we match its window by wm class instead
-                if (metaWin.get_wm_class() === 'DropDownTerminalWindow')
-                    return true;
+            const {windowTracker} = DockManager;
+            const currentApp = windowTracker.get_window_app(metaWin);
+            const focusWindow = global.display.get_focus_window();
 
-                const {windowTracker} = DockManager;
-                const currentApp = windowTracker.get_window_app(metaWin);
-                const focusWindow = global.display.get_focus_window();
-
-                // Consider half maximized windows side by side
-                // and windows which are alwayson top
-                if (currentApp !== this._focusApp && currentApp !== this._topApp &&
-                    !((focusWindow && focusWindow.maximized_vertically &&
-                       !focusWindow.maximized_horizontally) &&
-                     (metaWin.maximized_vertically && !metaWin.maximized_horizontally) &&
-                     metaWin.get_monitor() === focusWindow.get_monitor()) &&
-                        !metaWin.is_above())
-                    return false;
-            }
-            break;
-
-        case IntellihideMode.MAXIMIZED_WINDOWS:
-            // Skip unmaximized windows
-            if (!metaWin.maximized_vertically && !metaWin.maximized_horizontally && !metaWin.fullscreen)
+            // Consider half maximized windows side by side
+            // and windows which are alwayson top
+            if (currentApp !== this._focusApp && currentApp !== this._topApp &&
+                !((focusWindow && focusWindow.maximized_vertically &&
+                   !focusWindow.maximized_horizontally) &&
+                 (metaWin.maximized_vertically && !metaWin.maximized_horizontally) &&
+                 metaWin.get_monitor() === focusWindow.get_monitor()) &&
+                    !metaWin.is_above())
                 return false;
-            break;
-
-        case IntellihideMode.ALWAYS_ON_TOP:
-            // Always on top, except for fullscreen windows
-            if (this._focusApp) {
-                const {focusWindow} = global.display;
-                if (!focusWindow?.fullscreen)
-                    return false;
-            }
-            break;
         }
 
         if (workspaceIndex === currentWorkspace && metaWin.showing_on_its_workspace())
@@ -2939,6 +2693,11 @@ export class ThemeManager {
             this._actor.add_style_class_name('straight-corner');
         else
             this._actor.remove_style_class_name('straight-corner');
+
+        if (settings.transparentBackground)
+            this._actor.add_style_class_name('transparent-background');
+        else
+            this._actor.remove_style_class_name('transparent-background');
     }
 
     updateCustomTheme() {
@@ -2987,6 +2746,7 @@ export class ThemeManager {
             'running-indicator-style',
             'extend-height',
             'force-straight-corner',
+            'transparent-background',
         ];
 
         this._signalsHandler.addWithLabel(Labels.THEME_CHANGED, ...keys.map(key => [

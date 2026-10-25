@@ -803,12 +803,6 @@ export function cairoSetSourceColor(cr, sourceColor) {
  *
  * @returns True if the system supports extended barriers.
  */
-export function supportsExtendedBarriers() {
-    if (global.display.supports_extended_barriers)
-        return global.display.supports_extended_barriers();
-    return !!(global.backend.capabilities & Meta.BackendCapabilities.BARRIERS);
-}
-
 export function addActor(element, actor) {
     if (element.add_actor)
         element.add_actor(actor);

@@ -90,7 +90,8 @@ const DockDashIconsVerticalLayout = GObject.registerClass(
         }
     });
 
-const baseIconSizes = [16, 22, 24, 32, 48, 64, 96, 128];
+// GNOME's dash icon sizes; the largest one is the size the dock's icons have when they fit.
+const baseIconSizes = [16, 22, 24, 32, 48, 64];
 
 /**
  * This class is a fork of the upstream dash class (ui.dash.js)
@@ -138,10 +139,10 @@ export const DockDash = GObject.registerClass({
 
         this._maxWidth = -1;
         this._maxHeight = -1;
-        this.iconSize = Docking.DockManager.settings.dashMaxIconSize;
+        this.iconSize = baseIconSizes.at(-1);
         this._availableIconSizes = baseIconSizes;
         this._shownInitially = false;
-        this._initializeIconSize(this.iconSize);
+        this._initializeIconSize();
         this._signalsHandler = new Utils.GlobalSignalsHandler(this);
 
         this._separator = null;
@@ -805,30 +806,26 @@ export const DockDash = GObject.registerClass({
         // Apps supposed to be in the dash
         const newApps = [];
 
-        const {showFavorites} = settings;
-        if (showFavorites)
-            newApps.push(...Object.values(favorites));
+        newApps.push(...Object.values(favorites));
 
-        if (settings.showRunning) {
-            // We reorder the running apps so that they don't change position on the
-            // dash with every redisplay() call
+        // We reorder the running apps so that they don't change position on the
+        // dash with every redisplay() call
 
-            // First: add the apps from the oldApps list that are still running
-            oldApps.forEach(oldApp => {
-                const index = running.indexOf(oldApp);
-                if (index > -1) {
-                    const [app] = running.splice(index, 1);
-                    if (!showFavorites || !(app.get_id() in favorites))
-                        newApps.push(app);
-                }
-            });
-
-            // Second: add the new apps
-            running.forEach(app => {
-                if (!showFavorites || !(app.get_id() in favorites))
+        // First: add the apps from the oldApps list that are still running
+        oldApps.forEach(oldApp => {
+            const index = running.indexOf(oldApp);
+            if (index > -1) {
+                const [app] = running.splice(index, 1);
+                if (!(app.get_id() in favorites))
                     newApps.push(app);
-            });
-        }
+            }
+        });
+
+        // Second: add the new apps
+        running.forEach(app => {
+            if (!(app.get_id() in favorites))
+                newApps.push(app);
+        });
 
         this._signalsHandler.removeWithLabel(Labels.SHOW_MOUNTS);
         this._signalsHandler.addWithLabel(Labels.SHOW_MOUNTS,
@@ -978,32 +975,20 @@ export const DockDash = GObject.registerClass({
         this.updateShowAppsButton();
     }
 
-    _initializeIconSize(maxSize) {
-        const maxAllowed = baseIconSizes[baseIconSizes.length - 1];
-        maxSize = Math.min(maxSize, maxAllowed);
-
-        if (Docking.DockManager.settings.iconSizeFixed) {
-            this._availableIconSizes = [maxSize];
-        } else {
-            this._availableIconSizes = baseIconSizes.filter(val => {
-                return val < maxSize;
-            });
-            this._availableIconSizes.push(maxSize);
-        }
+    // A fixed icon size keeps only the largest size, so the icons never shrink to fit.
+    _initializeIconSize() {
+        this._availableIconSizes = Docking.DockManager.settings.iconSizeFixed
+            ? [baseIconSizes.at(-1)] : baseIconSizes;
     }
 
-    setIconSize(maxSize, doNotAnimate) {
-        this._initializeIconSize(maxSize);
-
-        if (doNotAnimate)
-            this._shownInitially = false;
-
+    updateIconSize() {
+        this._initializeIconSize();
         this._queueRedisplay();
     }
 
     /**
      * Reset the displayed apps icon to maintain the correct order when changing
-     * show favorites/show running settings
+     * settings that change which apps the dock shows
      */
     resetAppIcons() {
         const children = this._box.get_children().filter(actor => {

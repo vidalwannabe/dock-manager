@@ -1380,35 +1380,7 @@ class RunningIndicatorBase extends IndicatorBase {
         this._source._dot.opacity = 255;
     }
 
-    _enableBacklight() {
-        const colorPalette = this._dominantColorExtractor._getColorPalette();
-
-        // Fallback
-        if (!colorPalette) {
-            this._source._iconContainer.set_style(
-                'border-radius: 5px;' +
-                'background-gradient-direction: vertical;' +
-                'background-gradient-start: #e0e0e0;' +
-                'background-gradient-end: darkgray;'
-            );
-
-            return;
-        }
-
-        this._source._iconContainer.set_style(
-            `${'border-radius: 5px;' +
-            'background-gradient-direction: vertical;' +
-            'background-gradient-start: '}${colorPalette.original};` +
-            `background-gradient-end: ${colorPalette.darker};`
-        );
-    }
-
-    _disableBacklight() {
-        this._source._iconContainer.set_style(null);
-    }
-
     destroy() {
-        this._disableBacklight();
         this._restoreDefaultDot();
 
         super.destroy();
@@ -1481,34 +1453,12 @@ class RunningIndicatorDots extends RunningIndicatorBase {
         this._area.connectObject('repaint', this._updateIndicator.bind(this), this);
         this._source._iconContainer.add_child(this._area);
 
-        const keys = ['custom-theme-running-dots-color',
-            'custom-theme-running-dots-border-color',
-            'custom-theme-running-dots-border-width',
-            'custom-theme-customize-running-dots',
-            'unity-backlit-items',
-            'running-indicator-dominant-color'];
-
-        keys.forEach(function (key) {
-            this._signalsHandler.add(
-                Docking.DockManager.settings,
-                `changed::${key}`,
-                this.update.bind(this)
-            );
-        }, this);
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::running-indicator-dominant-color', this.update.bind(this));
     }
 
     update() {
         super.update();
-
-        // Enable / Disable the backlight of running apps
-        if (Docking.DockManager.settings.unityBacklitItems) {
-            if (this._source.running)
-                this._enableBacklight();
-            else
-                this._disableBacklight();
-        } else {
-            this._disableBacklight();
-        }
 
         if (this._area)
             this._area.queue_repaint();
@@ -1526,42 +1476,13 @@ class RunningIndicatorDots extends RunningIndicatorBase {
         this._borderWidth = themeNode.get_border_width(this._side);
         this._bodyColor = themeNode.get_background_color();
 
-        const {settings} = Docking.DockManager;
-        // Adjust for the backlit case
-        const Color = Clutter.Color ?? Cogl.Color;
-
-        if (settings.unityBacklitItems) {
-            // Use dominant color for dots too if the backlit is enables
+        // Apply dominant color if requested, keeping the dot's color when the icon has none
+        if (Docking.DockManager.settings.runningIndicatorDominantColor) {
             const colorPalette = this._dominantColorExtractor._getColorPalette();
-
-            // Slightly adjust the styling
-            this._borderWidth = 2;
-
             if (colorPalette) {
-                [, this._borderColor] = Color.from_string(colorPalette.lighter);
-                [, this._bodyColor] = Color.from_string(colorPalette.darker);
-            } else {
-                // Fallback
-                [, this._borderColor] = Color.from_string('white');
-                [, this._bodyColor] = Color.from_string('gray');
-            }
-        }
-
-        // Apply dominant color if requested
-        if (settings.runningIndicatorDominantColor) {
-            const colorPalette = this._dominantColorExtractor._getColorPalette();
-            if (colorPalette)
+                const Color = Clutter.Color ?? Cogl.Color;
                 [, this._bodyColor] = Color.from_string(colorPalette.original);
-            else
-                // Fallback
-                [, this._bodyColor] = Color.from_string(settings.customThemeRunningDotsColor);
-        }
-
-        // Finally, use customize style if requested
-        if (settings.customThemeCustomizeRunningDots) {
-            [, this._borderColor] = Color.from_string(settings.customThemeRunningDotsBorderColor);
-            this._borderWidth = settings.customThemeRunningDotsBorderWidth;
-            [, this._bodyColor] =  Color.from_string(settings.customThemeRunningDotsColor);
+            }
         }
 
         // Define the radius as an arbitrary size, but keep large enough to account
@@ -1618,11 +1539,7 @@ class RunningIndicatorCiliora extends RunningIndicatorDots {
             const size =  Math.max(this._width / 20, this._borderWidth);
             const spacing = size; // separation between the dots
             const lineLength = this._width - (size * (this._number - 1)) - (spacing * (this._number - 1));
-            let padding = this._borderWidth;
-            // For the backlit case here we don't want the outer border visible
-            if (Docking.DockManager.settings.unityBacklitItems &&
-                !Docking.DockManager.settings.customThemeCustomizeRunningDots)
-                padding = 0;
+            const padding = this._borderWidth;
             const yOffset = this._height - padding - size;
 
             cr.setLineWidth(this._borderWidth);
@@ -1651,11 +1568,7 @@ class RunningIndicatorSegmented extends RunningIndicatorDots {
             const size =  Math.max(this._width / 20, this._borderWidth);
             const spacing = Math.ceil(this._width / 18); // separation between the dots
             const dashLength = Math.ceil((this._width - ((this._number - 1) * spacing)) / this._number);
-            let padding = this._borderWidth;
-            // For the backlit case here we don't want the outer border visible
-            if (Docking.DockManager.settings.unityBacklitItems &&
-                !Docking.DockManager.settings.customThemeCustomizeRunningDots)
-                padding = 0;
+            const padding = this._borderWidth;
             const yOffset = this._height - padding - size;
 
             cr.setLineWidth(this._borderWidth);
@@ -1680,11 +1593,7 @@ class RunningIndicatorSolid extends RunningIndicatorDots {
     _drawIndicator(cr) {
         if (this._source.running) {
             const size =  Math.max(this._width / 20, this._borderWidth);
-            let padding = this._borderWidth;
-            // For the backlit case here we don't want the outer border visible
-            if (Docking.DockManager.settings.unityBacklitItems &&
-                !Docking.DockManager.settings.customThemeCustomizeRunningDots)
-                padding = 0;
+            const padding = this._borderWidth;
             const yOffset = this._height - padding - size;
 
             cr.setLineWidth(this._borderWidth);
@@ -1775,12 +1684,7 @@ class RunningIndicatorMetro extends RunningIndicatorDots {
     _drawIndicator(cr) {
         if (this._source.running) {
             const size =  Math.max(this._width / 20, this._borderWidth);
-            let padding = 0;
-            // For the backlit case here we don't want the outer border visible
-            if (Docking.DockManager.settings.unityBacklitItems &&
-                !Docking.DockManager.settings.customThemeCustomizeRunningDots)
-                padding = 0;
-            const yOffset = this._height - padding - size;
+            const yOffset = this._height - size;
 
             const n = this._number;
             if (n <= 1) {
@@ -1973,8 +1877,8 @@ export class UnityIndicator extends IndicatorBase {
         const defaultFontSize = fontDesc.get_size() / 1024;
         let fontSize = defaultFontSize * 0.9;
         const {iconSize} = Main.overview.dash;
-        const defaultIconSize = Docking.DockManager.settings.get_default_value(
-            'dash-max-icon-size').unpack();
+        // Icon size the badge's font size is meant for
+        const defaultIconSize = 48;
 
         if (!fontDesc.get_size_is_absolute()) {
             // fontSize was expressed in points, so convert to pixel

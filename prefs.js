@@ -1,7 +1,6 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 import Adw from 'gi://Adw';
-import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -15,14 +14,13 @@ import {
 // Sliders save their value this long after the last move, so the dock is not resized for
 // every step of a drag.
 const SCALE_UPDATE_TIMEOUT = 500;
-const ICON_SIZES = [128, 96, 64, 48, 32, 24, 16];
 
 // One page with every setting, in the order of the former Position and size, Launchers and
 // Appearance tabs.
 export default class DockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('org.gnome.shell.extensions.dash-to-dock');
-        window.set_default_size(-1, 850);
+        window.set_default_size(600, 850);
 
         // Pending slider saves are dropped when the window closes.
         this._timeouts = new Set();
@@ -57,16 +55,6 @@ export default class DockPreferences extends ExtensionPreferences {
         });
         settings.bind('extend-height', dockSize, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
         group.add(dockSize);
-        group.add(switchRow(settings, 'extend-height', __('Panel mode: extend to the screen edge')));
-        const centerIcons = switchRow(settings, 'always-center-icons', __('Place icons to the center'));
-        settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
-        group.add(centerIcons);
-
-        group.add(this._scaleRow(settings, 'dash-max-icon-size', __('Icon size limit'), {
-            lower: 16, upper: 128, step: 1, digits: 0,
-            marks: ICON_SIZES.map(size => [size, `${size}`]),
-            format: value => `${value} px`,
-        }));
         group.add(switchRow(settings, 'icon-size-fixed', __('Fixed icon size: scroll to reveal other icons')));
 
         group.add(this._scaleRow(settings, 'preview-size-scale', __('Preview size scale'), {
@@ -87,41 +75,25 @@ export default class DockPreferences extends ExtensionPreferences {
 
         const autohide = switchRow(settings, 'autohide', __('Autohide'),
             __('Show the dock by mouse hover on the screen edge.'));
-        const pressure = switchRow(settings, 'require-pressure-to-show', __('Push to show: require pressure to show the dock'));
         const fullscreen = switchRow(settings, 'autohide-in-fullscreen', __('Enable in fullscreen mode'));
         const urgent = switchRow(settings, 'show-dock-urgent-notify', __('Show dock for urgent notifications'));
-        for (const option of [pressure, fullscreen, urgent])
+        for (const option of [fullscreen, urgent])
             settings.bind('autohide', option, 'sensitive', Gio.SettingsBindFlags.GET);
-
-        const dodge = switchRow(settings, 'intellihide', __('Dodge windows'),
-            __('Show the dock when it doesn\'t obstruct application windows.'));
-        const dodgeMode = enumChoice(settings, 'intellihide-mode', __('Windows to dodge'), [
-            __('All windows'),
-            __('Only focused application\'s windows'),
-            __('Only maximized windows'),
-            __('Always on top'),
-        ]);
-        settings.bind('intellihide', dodgeMode, 'sensitive', Gio.SettingsBindFlags.GET);
 
         const animation = spinRow(settings, 'animation-time', __('Animation duration (s)'), 0, 1, 0.05, 2);
         const hideTimeout = spinRow(settings, 'hide-delay', __('Hide timeout (s)'), 0, 1, 0.05, 2);
         const showTimeout = spinRow(settings, 'show-delay', __('Show timeout (s)'), 0, 1, 0.05, 2);
-        settings.bind('require-pressure-to-show', showTimeout, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
-        const threshold = spinRow(settings, 'pressure-threshold', __('Pressure threshold'), 0, 100, 5, 0);
-        settings.bind('require-pressure-to-show', threshold, 'sensitive', Gio.SettingsBindFlags.GET);
 
         const reset = new Gtk.Button({label: __('Reset to defaults'), valign: Gtk.Align.CENTER});
         reset.connect('clicked', () => {
-            for (const key of ['intellihide', 'autohide', 'intellihide-mode', 'autohide-in-fullscreen',
-                'show-dock-urgent-notify', 'require-pressure-to-show', 'animation-time',
-                'show-delay', 'hide-delay', 'pressure-threshold'])
+            for (const key of ['autohide', 'autohide-in-fullscreen', 'show-dock-urgent-notify',
+                'animation-time', 'show-delay', 'hide-delay'])
                 settings.reset(key);
         });
         const resetRow = new Adw.ActionRow();
         resetRow.add_suffix(reset);
 
-        for (const option of [autohide, pressure, fullscreen, urgent, dodge, dodgeMode,
-            animation, hideTimeout, showTimeout, threshold, resetRow])
+        for (const option of [autohide, fullscreen, urgent, animation, hideTimeout, showTimeout, resetRow])
             row.add_row(option);
         return row;
     }
@@ -166,8 +138,6 @@ export default class DockPreferences extends ExtensionPreferences {
 
     _launchersGroup(settings) {
         const group = new Adw.PreferencesGroup({title: __('Launchers')});
-        group.add(switchRow(settings, 'show-favorites', __('Show pinned applications')));
-        group.add(switchRow(settings, 'show-running', __('Show running applications')));
         group.add(isolateWorkspacesRow(settings));
         group.add(switchRow(settings, 'workspace-agnostic-urgent-windows', __('Show urgent windows despite current workspace')));
         group.add(switchRow(settings, 'isolate-monitors', __('Isolate monitors')));
@@ -198,6 +168,11 @@ export default class DockPreferences extends ExtensionPreferences {
     _appearanceGroup(settings) {
         const group = new Adw.PreferencesGroup({title: __('Appearance')});
         group.add(switchRow(settings, 'force-straight-corner', __('Force straight corner')));
+        group.add(switchRow(settings, 'transparent-background', __('Transparent background')));
+        group.add(switchRow(settings, 'extend-height', __('Panel mode: extend to the screen edge')));
+        const centerIcons = switchRow(settings, 'always-center-icons', __('Place icons to the center'));
+        settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
+        group.add(centerIcons);
 
         const indicators = enumChoice(settings, 'running-indicator-style', __('Customize windows counter indicators'), [
             __('Default'), __('Dots'), __('Squares'), __('Dashes'), __('Segmented'),
@@ -205,24 +180,12 @@ export default class DockPreferences extends ExtensionPreferences {
         ]);
         group.add(indicators);
 
-        // Options of the indicators, for any style but Default.
-        const backlit = switchRow(settings, 'unity-backlit-items', __('Enable Unity7 like glossy backlit items'));
+        // Dominant color, for any style but Default.
         const dominant = switchRow(settings, 'running-indicator-dominant-color', __('Use dominant color'));
-        const customize = switchRow(settings, 'custom-theme-customize-running-dots', __('Customize indicator style'));
-        const dotColor = colorRow(settings, 'custom-theme-running-dots-color', __('Color'));
-        const borderColor = colorRow(settings, 'custom-theme-running-dots-border-color', __('Border color'));
-        const borderWidth = spinRow(settings, 'custom-theme-running-dots-border-width', __('Border width'), 0, 10, 1, 0);
-        for (const row of [dotColor, borderColor, borderWidth])
-            settings.bind('custom-theme-customize-running-dots', row, 'sensitive', Gio.SettingsBindFlags.GET);
-
-        const options = [backlit, dominant, customize, dotColor, borderColor, borderWidth];
-        const syncOptions = () => {
-            const styled = settings.get_enum('running-indicator-style') !== 0;
-            options.forEach(row => (row.visible = styled));
-        };
-        settings.connect('changed::running-indicator-style', syncOptions);
-        syncOptions();
-        options.forEach(row => group.add(row));
+        const syncDominant = () => (dominant.visible = settings.get_enum('running-indicator-style') !== 0);
+        settings.connect('changed::running-indicator-style', syncDominant);
+        syncDominant();
+        group.add(dominant);
         return group;
     }
 }
@@ -252,18 +215,6 @@ function enumChoice(settings, key, title, labels) {
             settings.set_enum(key, row.selected);
     });
     settings.connect(`changed::${key}`, () => (row.selected = settings.get_enum(key)));
-    return row;
-}
-
-// A color button bound to a color setting saved as CSS text.
-function colorRow(settings, key, title) {
-    const button = new Gtk.ColorDialogButton({dialog: new Gtk.ColorDialog(), valign: Gtk.Align.CENTER});
-    const rgba = new Gdk.RGBA();
-    rgba.parse(settings.get_string(key));
-    button.rgba = rgba;
-    button.connect('notify::rgba', () => settings.set_string(key, button.rgba.to_string()));
-    const row = new Adw.ActionRow({title});
-    row.add_suffix(button);
     return row;
 }
 

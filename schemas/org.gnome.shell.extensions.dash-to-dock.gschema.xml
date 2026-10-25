@@ -8,12 +8,6 @@
     <value value='2' nick='BOTTOM'/>
     <value value='3' nick='LEFT'/>
   </enum>
-  <enum id='org.gnome.shell.extensions.dash-to-dock.intellihide-mode'>
-    <value value='0' nick='ALL_WINDOWS'/>
-    <value value='1' nick='FOCUS_APPLICATION_WINDOWS'/>
-    <value value='2' nick='MAXIMIZED_WINDOWS'/>
-    <value value='3' nick='ALWAYS_ON_TOP'/>
-  </enum>
     <enum id='org.gnome.shell.extensions.dash-to-dock.running-indicator-style'>
     <value value='0' nick='DEFAULT'/>
     <value value='1' nick='DOTS'/>
@@ -62,30 +56,10 @@
       <summary>Dock not shown on desktop</summary>
       <description>Enable or disable manualhide mode</description>
     </key>
-    <key type="b" name="intellihide">
-      <default>true</default>
-      <summary>Dock dodges windows</summary>
-      <description>Enable or disable intellihide mode</description>
-    </key>
-    <key name="intellihide-mode" enum="org.gnome.shell.extensions.dash-to-dock.intellihide-mode">
-      <default>'FOCUS_APPLICATION_WINDOWS'</default>
-      <summary>Define which windows are considered for intellihide.</summary>
-      <description></description>
-    </key>
     <key type="b" name="autohide">
       <default>true</default>
       <summary>Dock shown on mouse over</summary>
       <description>Enable or disable autohide mode</description>
-    </key>
-    <key type="b" name="require-pressure-to-show">
-      <default>true</default>
-      <summary>Require pressure to show dash</summary>
-      <description>Enable or disable requiring pressure to show the dash</description>
-    </key>
-    <key type="d" name="pressure-threshold">
-      <default>100</default>
-      <summary>Pressure threshold</summary>
-      <description>Sets how much pressure is needed to show the dash.</description>
     </key>
     <key type="b" name="autohide-in-fullscreen">
       <default>false</default>
@@ -102,11 +76,6 @@
       <summary>Dock always visible</summary>
       <description>Dock is always visible</description>
     </key>
-    <key type="i" name="dash-max-icon-size">
-      <default>48</default>
-      <summary>Maximum dash icon size</summary>
-      <description>Set the allowed maximum dash icon size. Allowed range: 16..64.</description>
-    </key>
     <key type="d" name="preview-size-scale">
       <default>0</default>
       <summary>Preview size scale</summary>
@@ -116,31 +85,6 @@
       <default>false</default>
       <summary>Fixed icon size</summary>
       <description>Keep the icon size fixed by scrolling the dock.</description>
-    </key>
-    <key type="b" name="custom-theme-customize-running-dots">
-      <default>false</default>
-      <summary>Customize the style of the running application indicators.</summary>
-      <description>Customize the style of the running application indicators.</description>
-    </key>
-    <key type="s" name="custom-theme-running-dots-color">
-      <default>"#ffffff"</default>
-      <summary>Running application indicators color</summary>
-      <description>Customize the color of the running application indicators.</description>
-    </key>
-    <key type="s" name="custom-theme-running-dots-border-color">
-      <default>"#ffffff"</default>
-      <summary>Running application indicators border color.</summary>
-      <description>Customize the border color of the running application indicators.</description>
-    </key>
-    <key type="i" name="custom-theme-running-dots-border-width">
-      <default>0</default>
-      <summary>Running application indicators border width.</summary>
-      <description>Customize the border width of the running application indicators.</description>
-    </key>
-    <key type="b" name="show-running">
-      <default>true</default>
-      <summary>Show running apps</summary>
-      <description>Show or hide running applications icons in the dash</description>
     </key>
     <key type="b" name="isolate-workspaces">
       <default>false</default>
@@ -171,11 +115,6 @@
       <default>false</default>
       <summary>Open windows preview by default</summary>
       <description>Window previews will show windows by default, rather than hide them behind a drop dowm menu.</description>
-    </key>
-    <key type="b" name="show-favorites">
-      <default>true</default>
-      <summary>Show favorites apps</summary>
-      <description>Show or hide favorite applications icons in the dash</description>
     </key>
     <key type="b" name="dance-urgent-applications">
       <default>true</default>
@@ -214,10 +153,10 @@
       <summary>Force straight corners in dash</summary>
       <description>Make the borders in the dash non rounded</description>
     </key>
-    <key name="unity-backlit-items" type="b">
+    <key name="transparent-background" type="b">
       <default>false</default>
-      <summary>Enable unity7 like glossy backlit items</summary>
-      <description>Emulate the unity7 backlit glossy items behaviour</description>
+      <summary>Transparent dash background</summary>
+      <description>Show the dock without its background.</description>
     </key>
     <key name="show-icons-emblems" type="b">
       <default>true</default>

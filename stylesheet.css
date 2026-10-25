@@ -1004,3 +1004,9 @@
 #dashtodockContainer.straight-corner #dash .dash-background {
   border-radius: 0;
 }
+
+#dashtodockContainer.transparent-background #dash .dash-background {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
