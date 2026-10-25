@@ -1,4 +1,7 @@
-# Dash to Dock
+# Dash to Dock (Dock Manager fork)
+
+Personal fork of [Dash to Dock](https://github.com/ubuntu/dash-to-dock) v110. Its only change: `stylesheet.css` keeps the dock's layout (margins, padding, sizes, spacing) and has no colors, backgrounds, corners or transparencies, so the dock shows GNOME's own style and any extension that recolors the shell recolors it too.
+
 ![screenshot](https://github.com/micheleg/dash-to-dock/raw/master/media/screenshot.jpg)
 
 ## A dock for the GNOME Shell
@@ -14,15 +17,7 @@ The extension can be installed directly from source, either for the convenience 
 
 ### Build Dependencies
 
-To compile the stylesheet you'll need an implementation of SASS. Dash to Dock supports `dart-sass` (`sass`), `sassc`, and `ruby-sass`. Every distro should have at least one of these implementations, we recommend using `dart-sass` (`sass`) or `sassc` over `ruby-sass` as `ruby-sass` is deprecated.
-
-By default, Dash to Dock will attempt to build with `sassc`. To change this behavior set the `SASS` environment variable to either `dart` or `ruby`.
-
-```bash
-export SASS=dart
-# or...
-export SASS=ruby
-```
+`glib-compile-schemas` and `gettext`. No SASS: this fork keeps a plain `stylesheet.css` with only the dock's layout, so it has no colors of its own (see the top of this file).
 
 ### Building
 
