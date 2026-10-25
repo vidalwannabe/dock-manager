@@ -28,7 +28,6 @@ import {
 
 import {
     AppIconsDecorator,
-    AppSpread,
     DockDash,
     DesktopIconsIntegration,
     FileManager1API,
@@ -61,21 +60,13 @@ export const State = Object.freeze({
     HIDING:  3,
 });
 
-const scrollAction = Object.freeze({
-    DO_NOTHING: 0,
-    CYCLE_WINDOWS: 1,
-    SWITCH_WORKSPACE: 2,
-});
-
 const Labels = Object.freeze({
     INITIALIZE: Symbol('initialize'),
     ISOLATION: Symbol('isolation'),
-    LOCATIONS: Symbol('locations'),
     MAIN_DASH: Symbol('main-dash'),
     OLD_DASH_CHANGES: Symbol('old-dash-changes'),
     SETTINGS: Symbol('settings'),
     STARTUP_ANIMATION: Symbol('startup-animation'),
-    WORKSPACE_SWITCH_SCROLL: Symbol('workspace-switch-scroll'),
     DOCKED_DASH_GLOBAL_SIGNALS: Symbol('docked-dash-global-signals'),
 });
 
@@ -297,7 +288,7 @@ const DockedDash = GObject.registerClass({
         // Create a new dash object
         this.dash = new DockDash.DockDash(this.monitorIndex);
 
-        if (Main.overview.isDummy || !settings.showShowAppsButton)
+        if (Main.overview.isDummy)
             this.dash.hideShowAppsButton();
 
         // Create the containers for sliding in and out and
@@ -412,8 +403,7 @@ const DockedDash = GObject.registerClass({
         // Load optional features that need to be activated for one dock only
         if (this.isMain)
             this._enableExtraFeatures();
-        // Load optional features that need to be activated once per dock
-        this._optionalScrollWorkspaceSwitch();
+        this._enableScrollWorkspaceSwitch();
 
         // Add dash container actor and the container to the Chrome.
         this.set_child(this._slider);
@@ -538,9 +528,9 @@ const DockedDash = GObject.registerClass({
         this._removeDockWatch();
         this._cancelDockDwell();
 
-        if (this._optionalScrollWorkspaceSwitchDeadTimeId) {
-            GLib.source_remove(this._optionalScrollWorkspaceSwitchDeadTimeId);
-            delete this._optionalScrollWorkspaceSwitchDeadTimeId;
+        if (this._scrollWorkspaceSwitchDeadTimeId) {
+            GLib.source_remove(this._scrollWorkspaceSwitchDeadTimeId);
+            delete this._scrollWorkspaceSwitchDeadTimeId;
         }
     }
 
@@ -595,12 +585,6 @@ const DockedDash = GObject.registerClass({
         const {settings} = DockManager;
         this._signalsHandler.addWithLabel(Labels.DOCKED_DASH_GLOBAL_SIGNALS, [
             settings,
-            'changed::scroll-action',
-            () => {
-                this._optionalScrollWorkspaceSwitch();
-            },
-        ], [
-            settings,
             'changed::dash-max-icon-size',
             () => {
                 this.dash.setIconSize(settings.dashMaxIconSize);
@@ -619,25 +603,6 @@ const DockedDash = GObject.registerClass({
             },
         ], [
             settings,
-            'changed::show-trash',
-            () => {
-                this.dash.resetAppIcons();
-            },
-            Utils.SignalsHandlerFlags.CONNECT_AFTER,
-        ], [
-            settings,
-            'changed::show-mounts',
-            () => {
-                this.dash.resetAppIcons();
-            },
-            Utils.SignalsHandlerFlags.CONNECT_AFTER,
-        ], [
-            settings,
-            'changed::isolate-locations',
-            () => this.dash.resetAppIcons(),
-            Utils.SignalsHandlerFlags.CONNECT_AFTER,
-        ], [
-            settings,
             'changed::dance-urgent-applications',
             () => this.dash.resetAppIcons(),
             Utils.SignalsHandlerFlags.CONNECT_AFTER,
@@ -646,28 +611,6 @@ const DockedDash = GObject.registerClass({
             'changed::show-running',
             () => {
                 this.dash.resetAppIcons();
-            },
-        ], [
-            settings,
-            'changed::show-apps-always-in-the-edge',
-            () => {
-                this.dash.updateShowAppsButton();
-            },
-        ], [
-            settings,
-            'changed::show-apps-at-top',
-            () => {
-                this.dash.updateShowAppsButton();
-            },
-        ], [
-            settings,
-            'changed::show-show-apps-button',
-            () => {
-                if (!Main.overview.isDummy &&
-                        settings.showShowAppsButton)
-                    this.dash.showShowAppsButton();
-                else
-                    this.dash.hideShowAppsButton();
             },
         ], [
             settings,
@@ -1437,30 +1380,8 @@ const DockedDash = GObject.registerClass({
     /**
      * Switch workspace by scrolling over the dock
      */
-    _optionalScrollWorkspaceSwitch() {
-        const isEnabled = () =>
-            DockManager.settings.scrollAction === scrollAction.SWITCH_WORKSPACE;
-
-        const enable = () => {
-            this._signalsHandler.removeWithLabel(Labels.WORKSPACE_SWITCH_SCROLL);
-
-            this._signalsHandler.addWithLabel(Labels.WORKSPACE_SWITCH_SCROLL,
-                this._box, 'scroll-event', (_, e) => onScrollEvent(e));
-        };
-
-        const disable = () => {
-            this._signalsHandler.removeWithLabel(Labels.WORKSPACE_SWITCH_SCROLL);
-
-            if (this._optionalScrollWorkspaceSwitchDeadTimeId) {
-                GLib.source_remove(this._optionalScrollWorkspaceSwitchDeadTimeId);
-                this._optionalScrollWorkspaceSwitchDeadTimeId = 0;
-            }
-        };
-
-        if (isEnabled())
-            enable();
-        else
-            disable();
+    _enableScrollWorkspaceSwitch() {
+        this._signalsHandler.add(this._box, 'scroll-event', (_, e) => onScrollEvent(e));
 
         // This was inspired to desktop-scroller@obsidien.github.com
         const onScrollEvent = event => {
@@ -1503,12 +1424,12 @@ const DockedDash = GObject.registerClass({
                 // Useful on laptops when using a touch pad.
 
                 // During the deadtime do nothing
-                if (this._optionalScrollWorkspaceSwitchDeadTimeId) {
+                if (this._scrollWorkspaceSwitchDeadTimeId) {
                     return false;
                 } else {
-                    this._optionalScrollWorkspaceSwitchDeadTimeId = GLib.timeout_add(
+                    this._scrollWorkspaceSwitchDeadTimeId = GLib.timeout_add(
                         GLib.PRIORITY_DEFAULT, 250, () => {
-                            this._optionalScrollWorkspaceSwitchDeadTimeId = 0;
+                            this._scrollWorkspaceSwitchDeadTimeId = 0;
                         });
                 }
 
@@ -1554,190 +1475,7 @@ const DockedDash = GObject.registerClass({
             }
         };
     }
-
-    activateApp(appIndex) {
-        const children = this.dash._box.get_children().filter(
-            actor => !!actor.child?.app);
-
-        // Apps currently in the dash
-        const apps = children.map(actor => actor.child);
-
-        // Activate with button = 1, i.e. same as left click
-        const button = 1;
-        if (appIndex < apps.length)
-            apps[appIndex].activate(button);
-    }
 });
-
-/*
- * Handle keyboard shortcuts
- */
-const KeyboardShortcuts = class DashToDockKeyboardShortcuts {
-    static NUM_HOTKEYS = 10;
-    static KEYS = ['app-hotkey', 'app-shift-hotkey', 'app-ctrl-hotkey'];
-
-    constructor() {
-        this._signalsHandler = new Utils.GlobalSignalsHandler();
-
-        this._hotKeysEnabled = false;
-        if (DockManager.settings.hotKeys)
-            this._enableHotKeys();
-
-        this._signalsHandler.add([
-            DockManager.settings,
-            'changed::hot-keys',
-            () => {
-                if (DockManager.settings.hotKeys)
-                    this._enableHotKeys();
-                else
-                    this._disableHotKeys();
-            },
-        ]);
-
-        this._optionalNumberOverlay();
-    }
-
-    destroy() {
-        this._hideOverlay();
-
-        // Remove keybindings
-        this._disableHotKeys();
-        this._disableExtraShortcut();
-        this._signalsHandler.destroy();
-    }
-
-    _enableHotKeys() {
-        if (this._hotKeysEnabled)
-            return;
-
-        // Setup keyboard bindings for dash elements
-        KeyboardShortcuts.KEYS.forEach(key => {
-            for (let i = 0; i < KeyboardShortcuts.NUM_HOTKEYS; i++) {
-                const appNum = i;
-                Main.wm.addKeybinding(`${key}-${i + 1}`, DockManager.settings,
-                    Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
-                    Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
-                    () => {
-                        const dockManager = DockManager.getDefault();
-                        let dock = dockManager.mainDock;
-
-                        if (Main.layoutManager.monitors.length > 1) {
-                            const monitorIndex =
-                                Main.layoutManager.findMonitorForPoint(...global.get_pointer());
-                            dock = dockManager.getDockByMonitor(monitorIndex) ??
-                                dockManager.mainDock;
-                        }
-
-                        dock.activateApp(appNum);
-                        this._showOverlay({docks: [dock]});
-                    });
-            }
-        }, this);
-
-        this._hotKeysEnabled = true;
-    }
-
-    _disableHotKeys() {
-        if (!this._hotKeysEnabled)
-            return;
-
-        KeyboardShortcuts.KEYS.forEach(key => {
-            for (let i = 0; i < KeyboardShortcuts.NUM_HOTKEYS; i++)
-                Main.wm.removeKeybinding(`${key}-${i + 1}`);
-        }, this);
-
-        this._hotKeysEnabled = false;
-    }
-
-    _optionalNumberOverlay() {
-        const {settings} = DockManager;
-        this._shortcutIsSet = false;
-        // Enable extra shortcut if either 'overlay' or 'show-dock' are true
-        if (settings.hotKeys &&
-           (settings.hotkeysOverlay || settings.hotkeysShowDock))
-            this._enableExtraShortcut();
-
-        this._signalsHandler.add([
-            settings,
-            'changed::hot-keys',
-            this._checkHotkeysOptions.bind(this),
-        ], [
-            settings,
-            'changed::hotkeys-overlay',
-            this._checkHotkeysOptions.bind(this),
-        ], [
-            settings,
-            'changed::hotkeys-show-dock',
-            this._checkHotkeysOptions.bind(this),
-        ]);
-    }
-
-    _checkHotkeysOptions() {
-        const {settings} = DockManager;
-
-        if (settings.hotKeys &&
-           (settings.hotkeysOverlay || settings.hotkeysShowDock))
-            this._enableExtraShortcut();
-        else
-            this._disableExtraShortcut();
-    }
-
-    _enableExtraShortcut() {
-        if (!this._shortcutIsSet) {
-            Main.wm.addKeybinding('shortcut', DockManager.settings,
-                Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
-                Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
-                () => this._showOverlay());
-            this._shortcutIsSet = true;
-        }
-    }
-
-    _disableExtraShortcut() {
-        if (this._shortcutIsSet) {
-            Main.wm.removeKeybinding('shortcut');
-            this._shortcutIsSet = false;
-        }
-    }
-
-    _showOverlay({docks} = {docks: DockManager.allDocks}) {
-        // Restart the counting if the shortcut is pressed again
-        if (this._numberOverlayTimeoutId)
-            this._hideOverlay();
-
-        docks.forEach(dock => {
-            const {dash} = dock;
-
-            if (DockManager.settings.hotkeysOverlay)
-                dash.toggleNumberOverlay(true);
-
-            // Show the dock if it is hidden
-            if (DockManager.settings.hotkeysShowDock)
-                dock.showDock();
-        });
-
-        const {shortcutTimeout} = DockManager.settings;
-        this._numberOverlayTimeoutId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, shortcutTimeout * 1000, () => {
-                this._hideOverlay({docks});
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    _hideOverlay({docks} = {docks: DockManager.allDocks}) {
-        if (!this._numberOverlayTimeoutId)
-            return;
-
-        GLib.source_remove(this._numberOverlayTimeoutId);
-        delete this._numberOverlayTimeoutId;
-
-        docks.forEach(dock => {
-            dock.dash.toggleNumberOverlay(false);
-
-            // Hide the dock again if necessary
-            dock.updateDashVisibility();
-        });
-    }
-};
 
 /**
  * Isolate overview to open new windows for inactive apps
@@ -1854,7 +1592,6 @@ export class DockManager {
         this._oldDash = Main.overview.isDummy ? null : Main.overview.dash;
         this._signalsHandler.add(this._oldDash, 'destroy', () => (this._oldDash = null));
         this._discreteGpuAvailable = AppDisplay.discreteGpuAvailable;
-        this._appSpread = new AppSpread.AppSpread();
         this._notificationsMonitor = new NotificationsMonitor.NotificationsMonitor();
         this._windowTracker = Shell.WindowTracker.get_default();
 
@@ -1898,7 +1635,7 @@ export class DockManager {
         // Connect relevant signals to the toggling function
         this._bindSettingsChanges();
 
-        this._ensureLocations();
+        this._createLocations();
 
         /* Array of all the docks created */
         this._allDocks = [];
@@ -1970,20 +1707,12 @@ export class DockManager {
         return this._removables;
     }
 
-    get trash() {
-        return this._trash;
-    }
-
     get desktopIconsUsableArea() {
         return this._desktopIconsUsableArea;
     }
 
     get discreteGpuAvailable() {
         return AppDisplay.discreteGpuAvailable || this._discreteGpuAvailable;
-    }
-
-    get appSpread() {
-        return this._appSpread;
     }
 
     get notificationsMonitor() {
@@ -1998,88 +1727,10 @@ export class DockManager {
         this._strutsManager?.setMonitorExtent(monitorIndex, extent);
     }
 
-    _ensureLocations() {
-        const {showMounts, showTrash} = this.settings;
-
-        if (showTrash || showMounts) {
-            if (!this._fm1Client)
-                this._fm1Client = new FileManager1API.FileManager1Client();
-        } else if (this._fm1Client) {
-            this._fm1Client.destroy();
-            this._fm1Client = null;
-        }
-
-        if (showMounts && !this._removables) {
-            this._removables = new Locations.Removables();
-        } else if (!showMounts && this._removables) {
-            this._removables.destroy();
-            this._removables = null;
-        }
-
-        if (showTrash && !this._trash) {
-            this._trash = new Locations.Trash();
-        } else if (!showTrash && this._trash) {
-            this._trash.destroy();
-            this._trash = null;
-        }
-
-        Locations.unWrapFileManagerApp();
-        [this._methodInjections, this._propertyInjections].forEach(
-            injections => injections.removeWithLabel(Labels.LOCATIONS));
-
-        if (showMounts || showTrash) {
-            if (this.settings.isolateLocations) {
-                const fileManagerApp = Locations.wrapFileManagerApp();
-
-                this._methodInjections.addWithLabel(Labels.LOCATIONS, [
-                    Shell.AppSystem.prototype, 'get_running',
-                    function (originalMethod, ...args) {
-                        /* eslint-disable no-invalid-this */
-                        const runningApps = originalMethod.call(this, ...args);
-                        const locationApps = Locations.getRunningApps();
-                        if (!locationApps.length)
-                            return runningApps;
-
-                        const fileManagerIdx = runningApps.indexOf(fileManagerApp);
-                        if (fileManagerIdx > -1 && fileManagerApp?.state !== Shell.AppState.RUNNING)
-                            runningApps.splice(fileManagerIdx, 1);
-
-                        return [...runningApps, ...locationApps].sort(Utils.shellAppCompare);
-                        /* eslint-enable no-invalid-this */
-                    },
-                ],
-                [
-                    Shell.WindowTracker.prototype, 'get_window_app',
-                    function (originalMethod, window) {
-                        /* eslint-disable no-invalid-this */
-                        const locationApp = Locations.getRunningApps().find(a =>
-                            a.get_windows().includes(window));
-                        return locationApp ?? originalMethod.call(this, window);
-                        /* eslint-enable no-invalid-this */
-                    },
-                ],
-                [
-                    Shell.WindowTracker.prototype, 'get_app_from_pid',
-                    function (originalMethod, pid) {
-                        /* eslint-disable no-invalid-this */
-                        const locationApp = Locations.getRunningApps().find(a =>
-                            a.get_pids().includes(pid));
-                        return locationApp ?? originalMethod.call(this, pid);
-                        /* eslint-enable no-invalid-this */
-                    },
-                ]);
-
-                const {get: defaultFocusAppGetter} = Object.getOwnPropertyDescriptor(
-                    Shell.WindowTracker.prototype, 'focus_app');
-                this._propertyInjections.addWithLabel(Labels.LOCATIONS,
-                    Shell.WindowTracker.prototype, 'focus_app', {
-                        get() {
-                            const locationApp = Locations.getRunningApps().find(a => a.isFocused);
-                            return locationApp ?? defaultFocusAppGetter.call(this);
-                        },
-                    });
-            }
-        }
+    // Mounted volumes and devices, and network volumes, are always in the dock.
+    _createLocations() {
+        this._fm1Client = new FileManager1API.FileManager1Client();
+        this._removables = new Locations.Removables();
     }
 
     _toggle() {
@@ -2182,18 +1833,6 @@ export class DockManager {
             () => this._adjustPanelCorners(),
         ], [
             this._settings,
-            'changed::show-trash',
-            () => this._ensureLocations(),
-        ], [
-            this._settings,
-            'changed::show-mounts',
-            () => this._ensureLocations(),
-        ], [
-            this._settings,
-            'changed::isolate-locations',
-            () => this._ensureLocations(),
-        ], [
-            this._settings,
             'changed::intellihide',
             () => {
                 if (!this._settings.intellihide)
@@ -2269,7 +1908,6 @@ export class DockManager {
         // Load optional features. We load *after* the docks are created, since
         // we need to connect the signals to all dock instances.
         this._workspaceIsolation = new WorkspaceIsolation();
-        this._keyboardShortcuts = new KeyboardShortcuts();
 
         this.emit('docks-ready');
     }
@@ -2692,24 +2330,6 @@ export class DockManager {
             });
 
         if (Main.layoutManager._startingUp) {
-            // Convince LayoutManager to use the legacy startup animation:
-            // Reset overview controls state to HIDDEN, as skipping the startup
-            // overview leaves it stuck at WINDOW_PICKER
-            if (this._settings.disableOverviewOnStartup) {
-                this._propertyInjections.addWithLabel(Labels.STARTUP_ANIMATION,
-                    Main.sessionMode, 'hasOverview', {
-                        get: () => false,
-                        set: () => console.trace('hasOverview setter blocked'),
-                    });
-
-                const {OverviewAdjustment} = OverviewControls;
-                this._propertyInjections.addWithLabel(Labels.STARTUP_ANIMATION,
-                    OverviewAdjustment.prototype, 'value', {
-                        get: () => OverviewControls.ControlsState.HIDDEN,
-                        set: () => {},
-                    });
-            }
-
             // Use a dummy actor as dash during the startup animation, until
             // we're done with it, so that nothing is really shown or modified
             // during the upstream startup animation, that still requires to
@@ -2728,13 +2348,6 @@ export class DockManager {
                     this._signalsHandler.removeWithLabel(Labels.STARTUP_ANIMATION);
                     replaceMainDash();
                     dummyDash.destroy();
-                    if (this._settings.disableOverviewOnStartup) {
-                        this._propertyInjections.removeWithLabel(Labels.STARTUP_ANIMATION);
-                        this.overviewControls._stateAdjustment.value =
-                            OverviewControls.ControlsState.HIDDEN;
-                        if (Main.overview.visible)
-                            Main.overview.hide();
-                    }
                 });
         } else {
             replaceMainDash();
@@ -2744,7 +2357,6 @@ export class DockManager {
     _deleteDocks() {
         // Remove extra features
         this._workspaceIsolation?.destroy();
-        this._keyboardShortcuts?.destroy();
         this._desktopIconsUsableArea?.resetMargins();
         this._strutsManager?.clear();
 
@@ -2836,10 +2448,6 @@ export class DockManager {
             this._fm1Client = null;
         }
         this._notificationsMonitor.destroy();
-        this._appSpread.destroy();
-        this._trash?.destroy();
-        this._trash = null;
-        Locations.unWrapFileManagerApp();
         this._removables?.destroy();
         this._removables = null;
         this._iconTheme = null;

@@ -25,28 +25,12 @@ const {gettext: __} = Extension;
 const {signals: Signals} = imports;
 
 const FALLBACK_REMOVABLE_MEDIA_ICON = 'drive-removable-media';
-const FALLBACK_TRASH_ICON = 'user-trash';
 const FILE_MANAGER_DESKTOP_APP_ID = 'org.gnome.Nautilus.desktop';
 const ATTRIBUTE_METADATA_CUSTOM_ICON = 'metadata::custom-icon';
-const TRASH_URI = 'trash://';
-const UPDATE_TRASH_DELAY = 1000;
 const LAUNCH_HANDLER_MAX_WAIT = 200;
-
-const NautilusFileOperations2Interface = '<node>\
-    <interface name="org.gnome.Nautilus.FileOperations2">\
-        <method name="EmptyTrash">\
-            <arg type="b" name="ask_confirmation" direction="in"/>\
-            <arg type="a{sv}" name="platform_data" direction="in"/>\
-        </method>\
-    </interface>\
-</node>';
-
-const NautilusFileOperations2ProxyInterface =
-    Gio.DBusProxy.makeProxyWrapper(NautilusFileOperations2Interface);
 
 const Labels = Object.freeze({
     LOCATION_WINDOWS: Symbol('location-windows'),
-    WINDOWS_CHANGED: Symbol('windows-changed'),
 });
 
 const GJS_SUPPORTS_FILE_IFACE_PROMISES = imports.system.version >= 17101;
@@ -56,40 +40,6 @@ if (GJS_SUPPORTS_FILE_IFACE_PROMISES) {
     Gio._promisify(Gio.File.prototype, 'query_default_handler_async');
 }
 
-
-/**
- *
- */
-function makeNautilusFileOperationsProxy() {
-    const proxy = new NautilusFileOperations2ProxyInterface(
-        Gio.DBus.session,
-        'org.gnome.Nautilus',
-        '/org/gnome/Nautilus/FileOperations2', (_p, error) => {
-            if (error)
-                logError(error, 'Error connecting to Nautilus');
-        }
-    );
-
-    proxy.platformData = params => {
-        const defaultParams = {
-            parentHandle: '',
-            timestamp: global.get_current_time(),
-            windowPosition: 'center',
-        };
-        const {parentHandle, timestamp, windowPosition} = {
-            ...defaultParams,
-            ...params,
-        };
-
-        return {
-            'parent-handle': new GLib.Variant('s', parentHandle),
-            'timestamp': new GLib.Variant('u', timestamp),
-            'window-position': new GLib.Variant('s', windowPosition),
-        };
-    };
-
-    return proxy;
-}
 
 export const LocationAppInfo = GObject.registerClass({
     Implements: [Gio.AppInfo],
@@ -735,151 +685,6 @@ class MountableVolumeAppInfo extends LocationAppInfo {
     }
 });
 
-const TrashAppInfo = GObject.registerClass({
-    Implements: [Gio.AppInfo],
-    Properties: {
-        'empty': GObject.ParamSpec.boolean(
-            'empty', 'empty', 'empty',
-            GObject.ParamFlags.READWRITE,
-            true),
-    },
-},
-class TrashAppInfo extends LocationAppInfo {
-    static initPromises(file) {
-        if (TrashAppInfo._promisified)
-            return;
-
-        const trashProto = file.constructor.prototype;
-        Gio._promisify(Gio.FileEnumerator.prototype, 'close_async', 'close_finish');
-        Gio._promisify(Gio.FileEnumerator.prototype, 'next_files_async', 'next_files_finish');
-        Gio._promisify(trashProto, 'enumerate_children_async', 'enumerate_children_finish');
-        Gio._promisify(trashProto, 'query_info_async', 'query_info_finish');
-        TrashAppInfo._promisified = true;
-    }
-
-    _init(cancellable = null) {
-        super._init({
-            location: Gio.file_new_for_uri(TRASH_URI),
-            name: __('Trash'),
-            icon: Gio.ThemedIcon.new(FALLBACK_TRASH_ICON),
-            cancellable,
-        });
-        TrashAppInfo.initPromises(this.location);
-
-        try {
-            this._monitor = this.location.monitor_directory(0, this.cancellable);
-            this._schedUpdateId = 0;
-            this._monitorChangedId = this._monitor.connect('changed', () =>
-                this._onTrashChange());
-        } catch (e) {
-            if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                return;
-            logError(e, 'Impossible to monitor trash');
-        }
-        this._updateTrash();
-
-        this.connect('notify::empty', () => this._updateLocationIcon());
-        this.notify('empty');
-    }
-
-    destroy() {
-        if (this._schedUpdateId) {
-            GLib.source_remove(this._schedUpdateId);
-            this._schedUpdateId = 0;
-        }
-        this._updateTrashCancellable?.cancel();
-        this._monitor?.disconnect(this._monitorChangedId);
-        this._monitor = null;
-
-        super.destroy();
-    }
-
-    list_actions() {
-        return this.empty ? [] : ['empty-trash'];
-    }
-
-    get_action_name(action) {
-        switch (action) {
-        case 'empty-trash':
-            return __('Empty Trash');
-        default:
-            return null;
-        }
-    }
-
-    _onTrashChange() {
-        if (this._schedUpdateId) {
-            GLib.source_remove(this._schedUpdateId);
-            this._schedUpdateId = 0;
-        }
-
-        if (this._monitor.is_cancelled())
-            return;
-
-        this._schedUpdateId = GLib.timeout_add(GLib.PRIORITY_LOW,
-            UPDATE_TRASH_DELAY, () => {
-                this._schedUpdateId = 0;
-                this._updateTrash();
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    async _updateTrash() {
-        const priority = GLib.PRIORITY_LOW;
-        this._updateTrashCancellable?.cancel();
-        const cancellable = new Utils.CancellableChild(this.cancellable);
-        this._updateTrashCancellable = cancellable;
-
-        try {
-            const trashInfo = await this.location.query_info_async(
-                Gio.FILE_ATTRIBUTE_TRASH_ITEM_COUNT,
-                Gio.FileQueryInfoFlags.NONE,
-                priority, cancellable);
-            this.empty = !trashInfo.get_attribute_uint32(
-                Gio.FILE_ATTRIBUTE_TRASH_ITEM_COUNT);
-            return;
-        } catch (e) {
-            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                logError(e, 'Impossible to get trash children from infos');
-        } finally {
-            cancellable.cancel();
-            if (this._updateIconCancellable === cancellable)
-                delete this._updateTrashCancellable;
-        }
-
-        try {
-            const childrenEnumerator = await this.location.enumerate_children_async(
-                Gio.FILE_ATTRIBUTE_STANDARD_TYPE, Gio.FileQueryInfoFlags.NONE,
-                priority, cancellable);
-            const children = await childrenEnumerator.next_files_async(1,
-                priority, cancellable);
-            this.empty = !children.length;
-
-            await childrenEnumerator.close_async(priority, null);
-        } catch (e) {
-            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                logError(e, 'Impossible to enumerate trash children');
-        } finally {
-            cancellable.cancel();
-            if (this._updateIconCancellable === cancellable)
-                delete this._updateTrashCancellable;
-        }
-    }
-
-    launchAction(action, timestamp) {
-        if (!this.list_actions().includes(action))
-            throw new Error('Action %s is not supported by %s', action, this);
-
-        const nautilus = makeNautilusFileOperationsProxy();
-        const askConfirmation = true;
-        nautilus.EmptyTrashRemote(askConfirmation,
-            nautilus.platformData({timestamp}), (_p, error) => {
-                if (error)
-                    logError(error, 'Empty trash failed');
-            }, this.cancellable);
-    }
-});
-
 /**
  * @param shellApp
  */
@@ -1118,7 +923,6 @@ function makeLocationApp(params) {
 
     shellApp._setDtdData({
         location: () => shellApp.appInfo.location,
-        isTrash: shellApp.appInfo instanceof TrashAppInfo,
     }, {getter: true, enumerable: true});
 
     shellApp._mi('toString', defaultToString =>
@@ -1252,105 +1056,6 @@ function getFileManagerApp() {
 }
 
 /**
- *
- */
-export function wrapFileManagerApp() {
-    const fileManagerApp = getFileManagerApp();
-    if (!fileManagerApp)
-        return null;
-
-    if (fileManagerApp._dtdData)
-        return fileManagerApp;
-
-    const originalGetWindows = fileManagerApp.get_windows;
-    wrapWindowsBackedApp(fileManagerApp);
-
-    const {removables, trash} = Docking.DockManager.getDefault();
-    fileManagerApp._signalConnections.addWithLabel(Labels.WINDOWS_CHANGED,
-        fileManagerApp, 'windows-changed', () => {
-            fileManagerApp.stop_emission_by_name('windows-changed');
-            // Let's wait for the location app to take control before of us
-            const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
-                fileManagerApp._sources.delete(id);
-                fileManagerApp._updateWindows();
-                return GLib.SOURCE_REMOVE;
-            });
-            fileManagerApp._sources.add(id);
-        });
-
-    fileManagerApp._signalConnections.add(global.workspaceManager,
-        'workspace-switched', () => {
-            fileManagerApp._signalConnections.blockWithLabel(Labels.WINDOWS_CHANGED);
-            fileManagerApp.emit('windows-changed');
-            fileManagerApp._signalConnections.unblockWithLabel(Labels.WINDOWS_CHANGED);
-        });
-
-    if (removables) {
-        fileManagerApp._signalConnections.add(removables, 'changed', () =>
-            fileManagerApp._updateWindows());
-        fileManagerApp._signalConnections.add(removables, 'windows-changed', () =>
-            fileManagerApp._updateWindows());
-    }
-
-    if (trash?.getApp()) {
-        fileManagerApp._signalConnections.add(trash.getApp(), 'windows-changed', () =>
-            fileManagerApp._updateWindows());
-    }
-
-    fileManagerApp._updateWindows = function () {
-        const locationWindows = [];
-        getRunningApps().forEach(a => locationWindows.push(...a.get_windows()));
-        const windows = originalGetWindows.call(this).filter(w =>
-            !locationWindows.includes(w));
-
-        this._signalConnections.blockWithLabel(Labels.WINDOWS_CHANGED);
-        this._setWindows(windows);
-        this._signalConnections.unblockWithLabel(Labels.WINDOWS_CHANGED);
-    };
-
-    fileManagerApp._mi('toString', defaultToString =>
-        '[FileManagerApp - %s]'.format(defaultToString.call(fileManagerApp)));
-
-    return fileManagerApp;
-}
-
-/**
- *
- */
-export function unWrapFileManagerApp() {
-    const fileManagerApp = getFileManagerApp();
-    if (!fileManagerApp || !fileManagerApp._dtdData)
-        return;
-
-    fileManagerApp.destroy();
-}
-
-/**
- * This class maintains a Shell.App representing the Trash and keeps it
- * up-to-date as the trash fills and is emptied over time.
- */
-export class Trash {
-    destroy() {
-        this._trashApp?.destroy();
-    }
-
-    _ensureApp() {
-        if (this._trashApp)
-            return;
-
-        this._trashApp = makeLocationApp({
-            appInfo: new TrashAppInfo(new Gio.Cancellable()),
-            fallbackIconName: FALLBACK_TRASH_ICON,
-        });
-    }
-
-    getApp() {
-        this._ensureApp();
-        return this._trashApp;
-    }
-}
-
-/**
  * This class maintains Shell.App representations for removable devices
  * plugged into the system, and keeps the list of Apps up-to-date as
  * devices come and go and are mounted and unmounted.
@@ -1402,14 +1107,6 @@ export class Removables {
             this._monitor,
             'mount-added',
             (_, mount) => this._onMountAdded(mount),
-        ], [
-            Docking.DockManager.settings,
-            'changed::show-mounts-only-mounted',
-            () => this._updateVolumes(),
-        ], [
-            Docking.DockManager.settings,
-            'changed::show-mounts-network',
-            () => this._updateVolumes(),
         ]);
     }
 
@@ -1433,23 +1130,12 @@ export class Removables {
     _onVolumeAdded(volume) {
         Removables.initVolumePromises(volume);
 
-        if (!Docking.DockManager.settings.showMountsNetwork &&
-            volume.get_identifier('class') === 'network')
-            return;
-
-
+        // Only mounted volumes and devices are shown, network volumes included.
         const mount = volume.get_mount();
-        if (mount) {
-            if (mount.is_shadowed())
-                return;
-            if (!mount.can_eject() && !mount.can_unmount())
-                return;
-        } else {
-            if (Docking.DockManager.settings.showMountsOnlyMounted)
-                return;
-            if (!volume.can_mount() && !volume.can_eject())
-                return;
-        }
+        if (!mount || mount.is_shadowed())
+            return;
+        if (!mount.can_eject() && !mount.can_unmount())
+            return;
 
         const appInfo = new MountableVolumeAppInfo(volume,
             new Utils.CancellableChild(this._cancellable));
@@ -1461,10 +1147,8 @@ export class Removables {
         volumeApp._signalConnections.add(volumeApp, 'windows-changed',
             () => this.emit('windows-changed', volumeApp));
 
-        if (Docking.DockManager.settings.showMountsOnlyMounted) {
-            volumeApp._signalConnections.add(appInfo, 'notify::mount',
-                () => !appInfo.mount && this._onVolumeRemoved(appInfo.volume));
-        }
+        volumeApp._signalConnections.add(appInfo, 'notify::mount',
+            () => !appInfo.mount && this._onVolumeRemoved(appInfo.volume));
 
         this._volumeApps.push(volumeApp);
         this.emit('changed');
@@ -1485,9 +1169,6 @@ export class Removables {
     _onMountAdded(mount) {
         Removables.initMountPromises(mount);
 
-        if (!Docking.DockManager.settings.showMountsOnlyMounted)
-            return;
-
         if (!this._volumeApps.find(({appInfo}) => appInfo.mount === mount)) {
             // In some Gio.Mount implementations the volume may be set after
             // mount is emitted, so we could just ignore it as we'll get it
@@ -1503,33 +1184,3 @@ export class Removables {
     }
 }
 Signals.addSignalMethods(Removables.prototype);
-
-/**
- *
- */
-function getApps() {
-    const dockManager = Docking.DockManager.getDefault();
-    const locationApps = [];
-
-    if (dockManager.removables)
-        locationApps.push(...dockManager.removables.getApps());
-
-    if (dockManager.trash)
-        locationApps.push(dockManager.trash.getApp());
-
-    return locationApps;
-}
-
-/**
- *
- */
-export function getRunningApps() {
-    return getApps().filter(a => a.state === Shell.AppState.RUNNING);
-}
-
-/**
- *
- */
-export function getStartingApps() {
-    return getApps().filter(a => a.state === Shell.AppState.STARTING);
-}

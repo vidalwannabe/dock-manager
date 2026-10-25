@@ -1,40 +1,372 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
-import GLib from 'gi://GLib';
-import GObject from 'gi://GObject';
+import Adw from 'gi://Adw';
 import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
-import Adw from 'gi://Adw';
 
 import {
     ExtensionPreferences,
-
-    // Use __ () and N__() for the extension gettext domain, and reuse
-    // the shell domain with the default _() and N_()
     gettext as __,
 } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+// Sliders save their value this long after the last move, so the dock is not resized for
+// every step of a drag.
 const SCALE_UPDATE_TIMEOUT = 500;
-const DEFAULT_ICONS_SIZES = [128, 96, 64, 48, 32, 24, 16];
+const ICON_SIZES = [128, 96, 64, 48, 32, 24, 16];
 
-const TransparencyMode = Object.freeze({
-    DEFAULT: 0,
-    FIXED: 1,
-    DYNAMIC: 3,
-});
+// One page with every setting, in the order of the former Position and size, Launchers and
+// Appearance tabs.
+export default class DockPreferences extends ExtensionPreferences {
+    fillPreferencesWindow(window) {
+        const settings = this.getSettings('org.gnome.shell.extensions.dash-to-dock');
+        window.set_default_size(-1, 850);
 
-const RunningIndicatorStyle = Object.freeze({
-    DEFAULT: 0,
-    DOTS: 1,
-    SQUARES: 2,
-    DASHES: 3,
-    SEGMENTED: 4,
-    SOLID: 5,
-    CILIORA: 6,
-    METRO: 7,
-});
+        // Pending slider saves are dropped when the window closes.
+        this._timeouts = new Set();
+        window.connect('close-request', () => {
+            this._timeouts.forEach(id => GLib.source_remove(id));
+            this._timeouts.clear();
+            return false;
+        });
 
+        const page = new Adw.PreferencesPage();
+        page.add(this._positionAndSizeGroup(settings));
+        page.add(this._launchersGroup(settings));
+        page.add(this._appearanceGroup(settings));
+        window.add(page);
+    }
+
+    // ---------- Position and size ----------
+
+    _positionAndSizeGroup(settings) {
+        const group = new Adw.PreferencesGroup({title: __('Position and size')});
+
+        const monitorRow = monitorChoice(settings);
+        settings.bind('multi-monitor', monitorRow, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
+        group.add(monitorRow);
+        group.add(switchRow(settings, 'multi-monitor', __('Show on all monitors')));
+        group.add(positionChoice(settings));
+        group.add(this._autohideRow(settings));
+
+        const dockSize = this._scaleRow(settings, 'height-fraction', __('Dock size limit'), {
+            lower: 0.33, upper: 1, step: 0.01, digits: 2, marks: [[0.9, null]],
+            format: value => `${Math.round(value * 100)} %`,
+        });
+        settings.bind('extend-height', dockSize, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
+        group.add(dockSize);
+        group.add(switchRow(settings, 'extend-height', __('Panel mode: extend to the screen edge')));
+        const centerIcons = switchRow(settings, 'always-center-icons', __('Place icons to the center'));
+        settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
+        group.add(centerIcons);
+
+        group.add(this._scaleRow(settings, 'dash-max-icon-size', __('Icon size limit'), {
+            lower: 16, upper: 128, step: 1, digits: 0,
+            marks: ICON_SIZES.map(size => [size, `${size}`]),
+            format: value => `${value} px`,
+        }));
+        group.add(switchRow(settings, 'icon-size-fixed', __('Fixed icon size: scroll to reveal other icons')));
+
+        group.add(this._scaleRow(settings, 'preview-size-scale', __('Preview size scale'), {
+            lower: 0, upper: 1, step: 0.01, digits: 2,
+            format: value => value === 0 ? 'auto' : `${value}`,
+        }));
+        return group;
+    }
+
+    // Intelligent autohide: on unless the dock is fixed, with its options inside.
+    _autohideRow(settings) {
+        const row = new Adw.ExpanderRow({
+            title: __('Intelligent autohide'),
+            subtitle: __('Hide the dock when it obstructs a window of the current application. More refined settings are available.'),
+            show_enable_switch: true,
+        });
+        settings.bind('dock-fixed', row, 'enable-expansion', Gio.SettingsBindFlags.INVERT_BOOLEAN);
+
+        const autohide = switchRow(settings, 'autohide', __('Autohide'),
+            __('Show the dock by mouse hover on the screen edge.'));
+        const pressure = switchRow(settings, 'require-pressure-to-show', __('Push to show: require pressure to show the dock'));
+        const fullscreen = switchRow(settings, 'autohide-in-fullscreen', __('Enable in fullscreen mode'));
+        const urgent = switchRow(settings, 'show-dock-urgent-notify', __('Show dock for urgent notifications'));
+        for (const option of [pressure, fullscreen, urgent])
+            settings.bind('autohide', option, 'sensitive', Gio.SettingsBindFlags.GET);
+
+        const dodge = switchRow(settings, 'intellihide', __('Dodge windows'),
+            __('Show the dock when it doesn\'t obstruct application windows.'));
+        const dodgeMode = enumChoice(settings, 'intellihide-mode', __('Windows to dodge'), [
+            __('All windows'),
+            __('Only focused application\'s windows'),
+            __('Only maximized windows'),
+            __('Always on top'),
+        ]);
+        settings.bind('intellihide', dodgeMode, 'sensitive', Gio.SettingsBindFlags.GET);
+
+        const animation = spinRow(settings, 'animation-time', __('Animation duration (s)'), 0, 1, 0.05, 2);
+        const hideTimeout = spinRow(settings, 'hide-delay', __('Hide timeout (s)'), 0, 1, 0.05, 2);
+        const showTimeout = spinRow(settings, 'show-delay', __('Show timeout (s)'), 0, 1, 0.05, 2);
+        settings.bind('require-pressure-to-show', showTimeout, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
+        const threshold = spinRow(settings, 'pressure-threshold', __('Pressure threshold'), 0, 100, 5, 0);
+        settings.bind('require-pressure-to-show', threshold, 'sensitive', Gio.SettingsBindFlags.GET);
+
+        const reset = new Gtk.Button({label: __('Reset to defaults'), valign: Gtk.Align.CENTER});
+        reset.connect('clicked', () => {
+            for (const key of ['intellihide', 'autohide', 'intellihide-mode', 'autohide-in-fullscreen',
+                'show-dock-urgent-notify', 'require-pressure-to-show', 'animation-time',
+                'show-delay', 'hide-delay', 'pressure-threshold'])
+                settings.reset(key);
+        });
+        const resetRow = new Adw.ActionRow();
+        resetRow.add_suffix(reset);
+
+        for (const option of [autohide, pressure, fullscreen, urgent, dodge, dodgeMode,
+            animation, hideTimeout, showTimeout, threshold, resetRow])
+            row.add_row(option);
+        return row;
+    }
+
+    // A slider bound to a number setting, saved a moment after it stops moving.
+    _scaleRow(settings, key, title, {lower, upper, step, digits, marks = [], format}) {
+        const isInt = settings.settings_schema.get_key(key).get_value_type().dup_string() === 'i';
+        const scale = new Gtk.Scale({
+            adjustment: new Gtk.Adjustment({lower, upper, step_increment: step, page_increment: step * 10}),
+            digits, draw_value: true, value_pos: Gtk.PositionType.RIGHT, hexpand: true,
+            valign: Gtk.Align.CENTER, width_request: 300,
+        });
+        scale.set_value(isInt ? settings.get_int(key) : settings.get_double(key));
+        scale.set_format_value_func((_scale, value) => format(value));
+        for (const [value, label] of marks)
+            scale.add_mark(value, Gtk.PositionType.TOP, label);
+
+        let timeoutId = 0;
+        scale.connect('value-changed', () => {
+            if (timeoutId) {
+                GLib.source_remove(timeoutId);
+                this._timeouts.delete(timeoutId);
+            }
+            timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, SCALE_UPDATE_TIMEOUT, () => {
+                this._timeouts.delete(timeoutId);
+                timeoutId = 0;
+                if (isInt)
+                    settings.set_int(key, scale.get_value());
+                else
+                    settings.set_double(key, scale.get_value());
+                return GLib.SOURCE_REMOVE;
+            });
+            this._timeouts.add(timeoutId);
+        });
+
+        const row = new Adw.ActionRow({title});
+        row.add_suffix(scale);
+        return row;
+    }
+
+    // ---------- Launchers ----------
+
+    _launchersGroup(settings) {
+        const group = new Adw.PreferencesGroup({title: __('Launchers')});
+        group.add(switchRow(settings, 'show-favorites', __('Show pinned applications')));
+        group.add(switchRow(settings, 'show-running', __('Show running applications')));
+        group.add(isolateWorkspacesRow(settings));
+        group.add(switchRow(settings, 'workspace-agnostic-urgent-windows', __('Show urgent windows despite current workspace')));
+        group.add(switchRow(settings, 'isolate-monitors', __('Isolate monitors')));
+        group.add(switchRow(settings, 'show-windows-preview', __('Show open windows\' previews')));
+        group.add(switchRow(settings, 'scroll-to-focused-application', __('Keep the focused application always visible in the dash')));
+        group.add(switchRow(settings, 'dance-urgent-applications', __('Wiggle urgent applications')));
+
+        group.add(switchRow(settings, 'show-icons-emblems', __('Show icons emblems'),
+            __('When enabled application icons will show notification counters and progress-bars (if Unity API is used).')));
+        const counter = switchRow(settings, 'show-icons-notifications-counter', __('Show the number of unread notifications'));
+        settings.bind('show-icons-emblems', counter, 'sensitive', Gio.SettingsBindFlags.GET);
+        group.add(counter);
+        const override = switchRow(settings, 'application-counter-overrides-notifications',
+            __('Application-provided counter overrides the notifications counter'));
+        const syncOverride = () => {
+            override.sensitive = settings.get_boolean('show-icons-emblems') &&
+                settings.get_boolean('show-icons-notifications-counter');
+        };
+        settings.connect('changed::show-icons-emblems', syncOverride);
+        settings.connect('changed::show-icons-notifications-counter', syncOverride);
+        syncOverride();
+        group.add(override);
+        return group;
+    }
+
+    // ---------- Appearance ----------
+
+    _appearanceGroup(settings) {
+        const group = new Adw.PreferencesGroup({title: __('Appearance')});
+        group.add(switchRow(settings, 'force-straight-corner', __('Force straight corner')));
+
+        const indicators = enumChoice(settings, 'running-indicator-style', __('Customize windows counter indicators'), [
+            __('Default'), __('Dots'), __('Squares'), __('Dashes'), __('Segmented'),
+            __('Solid'), __('Ciliora'), __('Metro'), __('Binary'), __('Dot'),
+        ]);
+        group.add(indicators);
+
+        // Options of the indicators, for any style but Default.
+        const backlit = switchRow(settings, 'unity-backlit-items', __('Enable Unity7 like glossy backlit items'));
+        const glossy = switchRow(settings, 'apply-glossy-effect', __('Apply glossy effect.'));
+        settings.bind('unity-backlit-items', glossy, 'sensitive', Gio.SettingsBindFlags.GET);
+        const dominant = switchRow(settings, 'running-indicator-dominant-color', __('Use dominant color'));
+        const customize = switchRow(settings, 'custom-theme-customize-running-dots', __('Customize indicator style'));
+        const dotColor = colorRow(settings, 'custom-theme-running-dots-color', __('Color'));
+        const borderColor = colorRow(settings, 'custom-theme-running-dots-border-color', __('Border color'));
+        const borderWidth = spinRow(settings, 'custom-theme-running-dots-border-width', __('Border width'), 0, 10, 1, 0);
+        for (const row of [dotColor, borderColor, borderWidth])
+            settings.bind('custom-theme-customize-running-dots', row, 'sensitive', Gio.SettingsBindFlags.GET);
+
+        const options = [backlit, glossy, dominant, customize, dotColor, borderColor, borderWidth];
+        const syncOptions = () => {
+            const styled = settings.get_enum('running-indicator-style') !== 0;
+            options.forEach(row => (row.visible = styled));
+        };
+        settings.connect('changed::running-indicator-style', syncOptions);
+        syncOptions();
+        options.forEach(row => group.add(row));
+        return group;
+    }
+}
+
+// ---------- Rows ----------
+
+function switchRow(settings, key, title, subtitle = null) {
+    const row = new Adw.SwitchRow({title, subtitle});
+    settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
+    return row;
+}
+
+function spinRow(settings, key, title, lower, upper, step, digits) {
+    const row = Adw.SpinRow.new_with_range(lower, upper, step);
+    row.title = title;
+    row.digits = digits;
+    settings.bind(key, row, 'value', Gio.SettingsBindFlags.DEFAULT);
+    return row;
+}
+
+// A choice bound to an enum setting whose values are 0, 1, 2... in the order of `labels`.
+function enumChoice(settings, key, title, labels) {
+    const row = new Adw.ComboRow({title, model: Gtk.StringList.new(labels)});
+    row.selected = settings.get_enum(key);
+    row.connect('notify::selected', () => {
+        if (row.selected !== settings.get_enum(key))
+            settings.set_enum(key, row.selected);
+    });
+    settings.connect(`changed::${key}`, () => (row.selected = settings.get_enum(key)));
+    return row;
+}
+
+// A color button bound to a color setting saved as CSS text.
+function colorRow(settings, key, title) {
+    const button = new Gtk.ColorDialogButton({dialog: new Gtk.ColorDialog(), valign: Gtk.Align.CENTER});
+    const rgba = new Gdk.RGBA();
+    rgba.parse(settings.get_string(key));
+    button.rgba = rgba;
+    button.connect('notify::rgba', () => settings.set_string(key, button.rgba.to_string()));
+    const row = new Adw.ActionRow({title});
+    row.add_suffix(button);
+    return row;
+}
+
+// Position on screen. The setting keeps the order Top, Right, Bottom, Left; in right to left
+// languages its Left is on the right.
+function positionChoice(settings) {
+    const rtl = Gtk.Widget.get_default_direction() === Gtk.TextDirection.RTL;
+    const positions = [
+        [3, rtl ? __('Right') : __('Left')],
+        [2, __('Bottom')],
+        [0, __('Top')],
+        [1, rtl ? __('Left') : __('Right')],
+    ];
+    const row = new Adw.ComboRow({
+        title: __('Position on screen'),
+        model: Gtk.StringList.new(positions.map(([, label]) => label)),
+    });
+    const show = () => {
+        row.selected = positions.findIndex(([value]) => value === settings.get_enum('dock-position'));
+    };
+    show();
+    row.connect('notify::selected', () => {
+        const [value] = positions[row.selected];
+        if (value !== settings.get_enum('dock-position'))
+            settings.set_enum('dock-position', value);
+    });
+    settings.connect('changed::dock-position', show);
+    return row;
+}
+
+// Isolate workspaces: follows GNOME Multitasking's Application Switching setting until it is
+// set here.
+function isolateWorkspacesRow(settings) {
+    const appSwitcher = new Gio.Settings({schema_id: 'org.gnome.shell.app-switcher'});
+    const row = new Adw.SwitchRow({title: __('Isolate workspaces')});
+    const hasOverride = () => settings.get_user_value('isolate-workspaces') !== null;
+    const gnomeIsolation = () => appSwitcher.get_boolean('current-workspace-only');
+
+    let showing = false;
+    const show = () => {
+        showing = true;
+        row.active = hasOverride() ? settings.get_boolean('isolate-workspaces') : gnomeIsolation();
+        showing = false;
+        row.subtitle = hasOverride() ? '' : __('Follows GNOME Multitasking\'s Application Switching setting.');
+    };
+    row.connect('notify::active', () => {
+        if (showing)
+            return;
+        if (row.active === gnomeIsolation())
+            settings.reset('isolate-workspaces');
+        else
+            settings.set_boolean('isolate-workspaces', row.active);
+    });
+    settings.connect('changed::isolate-workspaces', show);
+    appSwitcher.connect('changed::current-workspace-only', show);
+    show();
+    return row;
+}
+
+// ---------- Monitors ----------
+
+// "Show the dock on": the connected monitors, by their connector.
+function monitorChoice(settings) {
+    const names = new Gtk.StringList();
+    const row = new Adw.ComboRow({title: __('Show the dock on'), model: names});
+    const monitorsConfig = new MonitorsConfig();
+    let monitors = [];
+    let showing = false;
+
+    const show = () => {
+        const preferred = settings.get_int('preferred-monitor');
+        const preferredConnector = settings.get_string('preferred-monitor-by-connector');
+        monitors = monitorsConfig.monitors.filter(m => m.active || m.index === preferred);
+        showing = true;
+        names.splice(0, names.get_n_items(), monitors.map(m => m.isPrimary
+            /* TRANSLATORS: This will be followed by Display Name - Connector. */
+            ? `${__('Primary monitor: ') + m.displayName} - ${m.connector}`
+            /* TRANSLATORS: Followed by monitor index, Display Name - Connector. */
+            : `${__('Secondary monitor ') + (m.index + 1)} - ${m.displayName} - ${m.connector}`));
+        let selected = monitors.findIndex(m => m.index === preferred ||
+            (preferred === -2 && preferredConnector === m.connector));
+        if (selected < 0)
+            selected = monitors.findIndex(m => m.isPrimary);
+        if (selected >= 0)
+            row.selected = selected;
+        showing = false;
+    };
+    row.connect('notify::selected', () => {
+        const monitor = monitors[row.selected];
+        if (showing || !monitor)
+            return;
+        settings.set_string('preferred-monitor-by-connector', monitor.connector);
+        settings.set_int('preferred-monitor', -2);
+    });
+    monitorsConfig.connect('updated', show);
+    settings.connect('changed::preferred-monitor', show);
+    settings.connect('changed::preferred-monitor-by-connector', show);
+    return row;
+}
+
+// The monitors as Mutter sees them, with the indexes the dock uses (the primary one is 0).
 const MonitorsConfig = GObject.registerClass({
     Signals: {
         'updated': {},
@@ -66,15 +398,11 @@ const MonitorsConfig = GObject.registerClass({
             'org.gnome.Mutter.DisplayConfig',
             '/org/gnome/Mutter/DisplayConfig'
         );
-
-        // Connecting to a D-Bus signal
         this._monitorsConfigProxy.connectSignal('MonitorsChanged',
             () => this._updateResources());
 
         this._primaryMonitor = null;
         this._monitors = [];
-        this._logicalMonitors = [];
-
         this._updateResources();
     }
 
@@ -86,6 +414,7 @@ const MonitorsConfig = GObject.registerClass({
             }
 
             const [serial_, monitors, logicalMonitors] = resources;
+            this._monitors = [];
             let index = 0;
             for (const monitor of monitors) {
                 const [monitorSpecs, modes_, props] = monitor;
@@ -99,8 +428,7 @@ const MonitorsConfig = GObject.registerClass({
             }
 
             for (const logicalMonitor of logicalMonitors) {
-                const [x_, y_, scale_, transform_, isPrimary, monitorsSpecs] =
-                    logicalMonitor;
+                const [x_, y_, scale_, transform_, isPrimary, monitorsSpecs] = logicalMonitor;
 
                 // We only care about the first one really
                 for (const monitorSpecs of monitorsSpecs) {
@@ -131,1067 +459,19 @@ const MonitorsConfig = GObject.registerClass({
         });
     }
 
+    // The dock indexes monitors the old Gdk way, where the primary monitor is always 0
+    // (see _createDocks in docking.js).
     _updateMonitorsIndexes() {
-        // This function ensures that we follow the old Gdk indexing strategy
-        // for monitors, it can be removed when we don't care about breaking
-        // old user configurations or external apps configuring this extension
-        // such as ubuntu's gnome-control-center.
         const {index: primaryMonitorIndex} = this._primaryMonitor;
         for (const monitor of this._monitors) {
-            let {index} = monitor;
-            // The The dock uses the Gdk index for monitors, where the primary monitor
-            // always has index 0, so let's follow what dash-to-dock does in docking.js
-            // (as part of _createDocks), but using inverted math
-            index -= primaryMonitorIndex;
-
+            let index = monitor.index - primaryMonitorIndex;
             if (index < 0)
                 index += this._monitors.length;
-
             monitor.index = index;
         }
-    }
-
-    get primaryMonitor() {
-        return this._primaryMonitor;
     }
 
     get monitors() {
         return this._monitors;
     }
 });
-
-/**
- * @param settings
- */
-function setShortcut(settings) {
-    const shortcutText = settings.get_string('shortcut-text');
-    const [success, key, mods] = Gtk.accelerator_parse(shortcutText);
-
-    if (success && Gtk.accelerator_valid(key, mods)) {
-        const shortcut = Gtk.accelerator_name(key, mods);
-        settings.set_strv('shortcut', [shortcut]);
-    } else {
-        settings.set_strv('shortcut', []);
-    }
-}
-
-const DockSettings = GObject.registerClass({
-    Implements: [Gtk.BuilderScope],
-}, class DashToDockSettings extends GObject.Object {
-    _init(extensionPreferences) {
-        super._init();
-
-        this._extensionPreferences = extensionPreferences;
-        this._settings = extensionPreferences.getSettings(
-            'org.gnome.shell.extensions.dash-to-dock');
-        this._appSwitcherSettings = new Gio.Settings({schema_id: 'org.gnome.shell.app-switcher'});
-        this._rtl = Gtk.Widget.get_default_direction() === Gtk.TextDirection.RTL;
-
-        this._builder = new Gtk.Builder();
-        this._builder.set_scope(this);
-        this._builder.set_translation_domain(
-            extensionPreferences.metadata['gettext-domain']);
-        this._builder.add_from_file(`${extensionPreferences.path}/Settings.ui`);
-
-        const notebook = this._builder.get_object('settings_notebook');
-        const group = new Adw.PreferencesGroup();
-        group.add(notebook);
-        this.page = new Adw.PreferencesPage();
-        this.page.add(group);
-
-        // Set a reasonable initial window height
-        this.page.connect('realize', () => {
-            const rootWindow = this.page.get_root();
-            rootWindow.set_default_size(-1, 850);
-            rootWindow.connect('close-request', () => this._onWindowsClosed());
-        });
-
-        // Timeout to delay the update of the settings
-        this._dock_size_timeout = 0;
-        this._icon_size_timeout = 0;
-        this._opacity_timeout = 0;
-
-        this._monitorsConfig = new MonitorsConfig();
-        this._bindSettings();
-    }
-
-    _onWindowsClosed() {
-        if (this._dock_size_timeout) {
-            GLib.source_remove(this._dock_size_timeout);
-            delete this._dock_size_timeout;
-        }
-
-        if (this._icon_size_timeout) {
-            GLib.source_remove(this._icon_size_timeout);
-            delete this._icon_size_timeout;
-        }
-
-        if (this._opacity_timeout) {
-            GLib.source_remove(this._opacity_timeout);
-            delete this._opacity_timeout;
-        }
-    }
-
-    vfunc_create_closure(builder, handlerName, flags, connectObject) {
-        if (flags & Gtk.BuilderClosureFlags.SWAPPED)
-            throw new Error('Unsupported template signal flag "swapped"');
-
-        if (typeof this[handlerName] === 'undefined')
-            throw new Error(`${handlerName} is undefined`);
-
-        return this[handlerName].bind(connectObject || this);
-    }
-
-    dock_display_combo_changed_cb(combo) {
-        if (!this._monitors?.length || this._updatingSettings)
-            return;
-
-        const preferredMonitor = this._monitors[combo.get_active()].connector;
-
-        this._updatingSettings = true;
-        this._settings.set_string('preferred-monitor-by-connector', preferredMonitor);
-        this._settings.set_int('preferred-monitor', -2);
-        this._updatingSettings = false;
-    }
-
-    position_top_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('dock-position', 0);
-    }
-
-    position_right_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('dock-position', 1);
-    }
-
-    position_bottom_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('dock-position', 2);
-    }
-
-    position_left_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('dock-position', 3);
-    }
-
-    icon_size_combo_changed_cb(combo) {
-        this._settings.set_int('dash-max-icon-size', this._allIconSizes[combo.get_active()]);
-    }
-
-    dock_size_scale_value_changed_cb(scale) {
-        // Avoid settings the size continuously
-        if (this._dock_size_timeout > 0)
-            GLib.source_remove(this._dock_size_timeout);
-        this._dock_size_timeout = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, SCALE_UPDATE_TIMEOUT, () => {
-                this._settings.set_double('height-fraction', scale.get_value());
-                this._dock_size_timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    icon_size_scale_value_changed_cb(scale) {
-        // Avoid settings the size consinuosly
-        if (this._icon_size_timeout > 0)
-            GLib.source_remove(this._icon_size_timeout);
-        this._icon_size_timeout = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, SCALE_UPDATE_TIMEOUT, () => {
-                this._settings.set_int('dash-max-icon-size', scale.get_value());
-                this._icon_size_timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    preview_size_scale_format_value_cb(scale, value) {
-        return value === 0 ? 'auto' : value;
-    }
-
-    preview_size_scale_value_changed_cb(scale) {
-        this._settings.set_double('preview-size-scale', scale.get_value());
-    }
-
-    custom_opacity_scale_value_changed_cb(scale) {
-        // Avoid settings the opacity consinuosly as it's change is animated
-        if (this._opacity_timeout > 0)
-            GLib.source_remove(this._opacity_timeout);
-        this._opacity_timeout = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, SCALE_UPDATE_TIMEOUT, () => {
-                this._settings.set_double('background-opacity', scale.get_value());
-                this._opacity_timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    min_opacity_scale_value_changed_cb(scale) {
-        // Avoid settings the opacity consinuosly as it's change is animated
-        if (this._opacity_timeout > 0)
-            GLib.source_remove(this._opacity_timeout);
-        this._opacity_timeout = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, SCALE_UPDATE_TIMEOUT, () => {
-                this._settings.set_double('min-alpha', scale.get_value());
-                this._opacity_timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    max_opacity_scale_value_changed_cb(scale) {
-        // Avoid settings the opacity consinuosly as it's change is animated
-        if (this._opacity_timeout > 0)
-            GLib.source_remove(this._opacity_timeout);
-        this._opacity_timeout = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, SCALE_UPDATE_TIMEOUT, () => {
-                this._settings.set_double('max-alpha', scale.get_value());
-                this._opacity_timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    all_windows_radio_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('intellihide-mode', 0);
-    }
-
-    focus_application_windows_radio_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('intellihide-mode', 1);
-    }
-
-    maximized_windows_radio_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('intellihide-mode', 2);
-    }
-
-    always_on_top_radio_button_toggled_cb(button) {
-        if (button.get_active())
-            this._settings.set_enum('intellihide-mode', 3);
-    }
-
-    _updateMonitorsSettings() {
-        // Monitor options
-        const preferredMonitor = this._settings.get_int('preferred-monitor');
-        const preferredMonitorByConnector = this._settings.get_string('preferred-monitor-by-connector');
-        const dockMonitorCombo = this._builder.get_object('dock_monitor_combo');
-
-        this._monitors = [];
-        dockMonitorCombo.remove_all();
-        let primaryIndex = -1;
-
-        // Add connected monitors
-        for (const monitor of this._monitorsConfig.monitors) {
-            if (!monitor.active && monitor.index !== preferredMonitor)
-                continue;
-
-            if (monitor.isPrimary) {
-                dockMonitorCombo.append_text(
-                    /* TRANSLATORS: This will be followed by Display Name - Connector. */
-                    `${__('Primary monitor: ') + monitor.displayName} - ${
-                        monitor.connector}`);
-                primaryIndex = this._monitors.length;
-            } else {
-                dockMonitorCombo.append_text(
-                    /* TRANSLATORS: Followed by monitor index, Display Name - Connector. */
-                    `${__('Secondary monitor ') + (monitor.index + 1)} - ${
-                        monitor.displayName} - ${monitor.connector}`);
-            }
-
-            this._monitors.push(monitor);
-
-            if (monitor.index === preferredMonitor ||
-                (preferredMonitor === -2 && preferredMonitorByConnector === monitor.connector))
-                dockMonitorCombo.set_active(this._monitors.length - 1);
-        }
-
-        if (dockMonitorCombo.get_active() < 0 && primaryIndex >= 0)
-            dockMonitorCombo.set_active(primaryIndex);
-    }
-
-    _update_scroll_action_warning() {
-        const sensitive = !this._builder.get_object('icon_size_fixed_checkbutton').get_active();
-        this._builder.get_object('note_about_fixed_size_icon').set_visible(!sensitive);
-    }
-
-    _bindSettings() {
-        // Position and size panel
-
-        this._updateMonitorsSettings();
-        this._monitorsConfig.connect('updated',
-            () => this._updateMonitorsSettings());
-        this._settings.connect('changed::preferred-monitor',
-            () => this._updateMonitorsSettings());
-        this._settings.connect('changed::preferred-monitor-by-connector',
-            () => this._updateMonitorsSettings());
-
-        // Position option
-        const position = this._settings.get_enum('dock-position');
-
-        switch (position) {
-        case 0:
-            this._builder.get_object('position_top_button').set_active(true);
-            break;
-        case 1:
-            this._builder.get_object('position_right_button').set_active(true);
-            break;
-        case 2:
-            this._builder.get_object('position_bottom_button').set_active(true);
-            break;
-        case 3:
-            this._builder.get_object('position_left_button').set_active(true);
-            break;
-        }
-
-        if (this._rtl) {
-            /* Left is Right in rtl as a setting */
-            this._builder.get_object('position_left_button').set_label(__('Right'));
-            this._builder.get_object('position_right_button').set_label(__('Left'));
-        }
-
-        // Intelligent autohide options
-        this._settings.bind('dock-fixed',
-            this._builder.get_object('intelligent_autohide_switch'),
-            'active',
-            Gio.SettingsBindFlags.INVERT_BOOLEAN);
-        this._settings.bind('dock-fixed',
-            this._builder.get_object('intelligent_autohide_button'),
-            'sensitive',
-            Gio.SettingsBindFlags.INVERT_BOOLEAN);
-        this._settings.bind('autohide',
-            this._builder.get_object('autohide_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('autohide-in-fullscreen',
-            this._builder.get_object('autohide_enable_in_fullscreen_checkbutton'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-dock-urgent-notify',
-            this._builder.get_object('show_dock_urgent_notify_checkbutton'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('require-pressure-to-show',
-            this._builder.get_object('require_pressure_checkbutton'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('intellihide',
-            this._builder.get_object('intellihide_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('animation-time',
-            this._builder.get_object('animation_duration_spinbutton'),
-            'value',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('hide-delay',
-            this._builder.get_object('hide_timeout_spinbutton'),
-            'value',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-delay',
-            this._builder.get_object('show_timeout_spinbutton'),
-            'value',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('pressure-threshold',
-            this._builder.get_object('pressure_threshold_spinbutton'),
-            'value',
-            Gio.SettingsBindFlags.DEFAULT);
-
-        // this._builder.get_object('animation_duration_spinbutton').set_value(
-        //   this._settings.get_double('animation-time'));
-
-        // Create dialog for intelligent autohide advanced settings
-        this._builder.get_object('intelligent_autohide_button').connect('clicked', () => {
-            const dialog = new Gtk.Dialog({
-                title: __('Intelligent autohide customization'),
-                transient_for: this.page.get_root(),
-                use_header_bar: true,
-                modal: true,
-            });
-
-            // GTK+ leaves positive values for application-defined response ids.
-            // Use +1 for the reset action
-            dialog.add_button(__('Reset to defaults'), 1);
-
-            const box = this._builder.get_object('intelligent_autohide_advanced_settings_box');
-            dialog.get_content_area().append(box);
-
-            this._settings.bind('intellihide',
-                this._builder.get_object('intellihide_mode_box'),
-                'sensitive',
-                Gio.SettingsBindFlags.GET);
-
-            // intellihide mode
-
-            const intellihideModeRadioButtons = [
-                this._builder.get_object('all_windows_radio_button'),
-                this._builder.get_object('focus_application_windows_radio_button'),
-                this._builder.get_object('maximized_windows_radio_button'),
-                this._builder.get_object('always_on_top_radio_button'),
-            ];
-
-            intellihideModeRadioButtons[this._settings.get_enum('intellihide-mode')].set_active(true);
-
-            this._settings.bind('autohide',
-                this._builder.get_object('require_pressure_checkbutton'),
-                'sensitive',
-                Gio.SettingsBindFlags.GET);
-
-            this._settings.bind('autohide',
-                this._builder.get_object('autohide_enable_in_fullscreen_checkbutton'),
-                'sensitive',
-                Gio.SettingsBindFlags.GET);
-
-            this._settings.bind('autohide',
-                this._builder.get_object('show_dock_urgent_notify_checkbutton'),
-                'sensitive',
-                Gio.SettingsBindFlags.GET);
-
-            this._settings.bind('require-pressure-to-show',
-                this._builder.get_object('show_timeout_spinbutton'),
-                'sensitive',
-                Gio.SettingsBindFlags.INVERT_BOOLEAN);
-            this._settings.bind('require-pressure-to-show',
-                this._builder.get_object('show_timeout_label'),
-                'sensitive',
-                Gio.SettingsBindFlags.INVERT_BOOLEAN);
-            this._settings.bind('require-pressure-to-show',
-                this._builder.get_object('pressure_threshold_spinbutton'),
-                'sensitive',
-                Gio.SettingsBindFlags.DEFAULT);
-            this._settings.bind('require-pressure-to-show',
-                this._builder.get_object('pressure_threshold_label'),
-                'sensitive',
-                Gio.SettingsBindFlags.DEFAULT);
-
-            dialog.connect('response', (_, id) => {
-                if (id === 1) {
-                    // restore default settings for the relevant keys
-                    const keys = ['intellihide', 'autohide', 'intellihide-mode',
-                        'autohide-in-fullscreen', 'show-dock-urgent-notify',
-                        'require-pressure-to-show', 'animation-time',
-                        'show-delay', 'hide-delay', 'pressure-threshold'];
-                    keys.forEach(function (val) {
-                        this._settings.set_value(val, this._settings.get_default_value(val));
-                    }, this);
-                    intellihideModeRadioButtons[this._settings.get_enum('intellihide-mode')].set_active(true);
-                } else {
-                    // remove the settings box so it doesn't get destroyed;
-                    dialog.get_content_area().remove(box);
-                    dialog.destroy();
-                }
-            });
-
-            dialog.present();
-        });
-
-        // size options
-        const dockSizeScale = this._builder.get_object('dock_size_scale');
-        dockSizeScale.set_value(this._settings.get_double('height-fraction'));
-        dockSizeScale.add_mark(0.9, Gtk.PositionType.TOP, null);
-        dockSizeScale.set_format_value_func((_, value) => {
-            return `${Math.round(value * 100)} %`;
-        });
-        const iconSizeScale = this._builder.get_object('icon_size_scale');
-        iconSizeScale.set_range(8, DEFAULT_ICONS_SIZES[0]);
-        iconSizeScale.set_value(this._settings.get_int('dash-max-icon-size'));
-        DEFAULT_ICONS_SIZES.forEach(val => {
-            iconSizeScale.add_mark(val, Gtk.PositionType.TOP, val.toString());
-        });
-        iconSizeScale.set_format_value_func((_, value) => {
-            return `${value} px`;
-        });
-        this._builder.get_object('preview_size_scale').set_value(
-            this._settings.get_double('preview-size-scale'));
-
-        // Corrent for rtl languages
-        if (this._rtl) {
-            // Flip value position: this is not done automatically
-            dockSizeScale.set_value_pos(Gtk.PositionType.LEFT);
-            iconSizeScale.set_value_pos(Gtk.PositionType.LEFT);
-            // I suppose due to a bug, having a more than one mark and one above
-            // a value of 100 makes the rendering of the marks wrong in rtl.
-            // This doesn't happen setting the scale as not flippable
-            // and then manually inverting it
-            iconSizeScale.set_flippable(false);
-            iconSizeScale.set_inverted(true);
-        }
-
-        this._settings.bind('icon-size-fixed',
-            this._builder.get_object('icon_size_fixed_checkbutton'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('extend-height',
-            this._builder.get_object('dock_size_extend_checkbutton'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('extend-height',
-            this._builder.get_object('dock_size_scale'),
-            'sensitive',
-            Gio.SettingsBindFlags.INVERT_BOOLEAN);
-        this._settings.bind('always-center-icons',
-            this._builder.get_object('dock_center_icons_check'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('extend-height',
-            this._builder.get_object('dock_center_icons_check'),
-            'sensitive',
-            Gio.SettingsBindFlags.DEFAULT);
-
-        this._settings.bind('multi-monitor',
-            this._builder.get_object('dock_monitor_combo'),
-            'sensitive',
-            Gio.SettingsBindFlags.INVERT_BOOLEAN);
-
-
-        // Apps panel
-
-        this._settings.bind('show-running',
-            this._builder.get_object('show_running_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        const applicationButtonIsolationButton =
-            this._builder.get_object('application_button_isolation_button');
-        const applicationButtonIsolationLabel =
-            applicationButtonIsolationButton.label;
-
-        const hasIsolationOverride = () =>
-            this._settings.get_user_value('isolate-workspaces') !== null;
-        const gnomeIsolation = () =>
-            this._appSwitcherSettings.get_boolean('current-workspace-only');
-
-        let updatingIsolationButton = false;
-        const updateIsolationButton = () => {
-            updatingIsolationButton = true;
-            applicationButtonIsolationButton.active = hasIsolationOverride()
-                ? this._settings.get_boolean('isolate-workspaces')
-                : gnomeIsolation();
-            updatingIsolationButton = false;
-            applicationButtonIsolationButton.label = hasIsolationOverride()
-                ? applicationButtonIsolationLabel
-                : `${applicationButtonIsolationLabel}\n${
-                    __('Follows GNOME Multitasking\'s Application Switching setting.')}`;
-        };
-        applicationButtonIsolationButton.connect('notify::active', check => {
-            if (updatingIsolationButton)
-                return;
-            if (check.active === gnomeIsolation())
-                this._settings.reset('isolate-workspaces');
-            else
-                this._settings.set_boolean('isolate-workspaces', check.active);
-        });
-        updateIsolationButton();
-        this._settings.connect('changed::isolate-workspaces',
-            updateIsolationButton);
-        this._appSwitcherSettings.connect('changed::current-workspace-only',
-            updateIsolationButton);
-        this._settings.bind('workspace-agnostic-urgent-windows',
-            this._builder.get_object('application_button_urgent_button'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('isolate-monitors',
-            this._builder.get_object('application_button_monitor_isolation_button'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-windows-preview',
-            this._builder.get_object('windows_preview_button'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('multi-monitor',
-            this._builder.get_object('multi_monitor_button'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-favorites',
-            this._builder.get_object('show_favorite_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-trash',
-            this._builder.get_object('show_trash_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-mounts',
-            this._builder.get_object('show_mounts_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-mounts-only-mounted',
-            this._builder.get_object('show_only_mounted_devices_check'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-mounts-network',
-            this._builder.get_object('show_network_volumes_check'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('isolate-locations',
-            this._builder.get_object('isolate_locations_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        const isolateLocationsBindings = ['show_trash_switch', 'show_mounts_switch'];
-        const updateIsolateLocations = () => {
-            this._builder.get_object('isolate_locations_row').sensitive =
-                isolateLocationsBindings.some(s => this._builder.get_object(s).active);
-        };
-        updateIsolateLocations();
-        isolateLocationsBindings.forEach(s => this._builder.get_object(s).connect(
-            'notify::active', () => updateIsolateLocations()));
-        this._settings.bind('dance-urgent-applications',
-            this._builder.get_object('wiggle_urgent_applications_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('hide-tooltip',
-            this._builder.get_object('hide_tooltip_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-icons-emblems',
-            this._builder.get_object('show_icons_emblems_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        const notificationsCounterCheck = this._builder.get_object(
-            'notifications_counter_check');
-        this._settings.bind('show-icons-notifications-counter',
-            notificationsCounterCheck,
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-icons-emblems',
-            notificationsCounterCheck,
-            'sensitive',
-            Gio.SettingsBindFlags.GET);
-
-        const applicationsOverrideCounter =
-            this._builder.get_object('applications_override_counter');
-        this._settings.bind('application-counter-overrides-notifications',
-            applicationsOverrideCounter,
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        notificationsCounterCheck.bind_property('active',
-            applicationsOverrideCounter, 'sensitive',
-            GObject.BindingFlags.SYNC_CREATE);
-        this._settings.connect('changed::show-icons-emblems', () => {
-            if (this._settings.get_boolean('show-icons-emblems'))
-                applicationsOverrideCounter.sensitive = notificationsCounterCheck.active;
-            else
-                applicationsOverrideCounter.sensitive = false;
-        });
-        this._settings.bind('show-show-apps-button',
-            this._builder.get_object('show_applications_button_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-apps-at-top',
-            this._builder.get_object('application_button_first_button'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-show-apps-button',
-            this._builder.get_object('application_button_first_button'),
-            'sensitive',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-show-apps-button',
-            this._builder.get_object('application_button_animation_button'),
-            'sensitive',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-apps-always-in-the-edge',
-            this._builder.get_object('show_apps_always_in_the_edge'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('show-show-apps-button',
-            this._builder.get_object('show_apps_always_in_the_edge'),
-            'sensitive',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('scroll-to-focused-application',
-            this._builder.get_object('scroll_to_icon_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-
-
-        // Behavior panel
-
-        this._settings.bind('hot-keys',
-            this._builder.get_object('hot_keys_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('hot-keys',
-            this._builder.get_object('overlay_button'),
-            'sensitive',
-            Gio.SettingsBindFlags.DEFAULT);
-
-        this._builder.get_object('click_action_combo').set_active(this._settings.get_enum('click-action'));
-        this._builder.get_object('click_action_combo').connect('changed', widget => {
-            this._settings.set_enum('click-action', widget.get_active());
-        });
-
-        this._builder.get_object('icon_size_fixed_checkbutton').connect('toggled', () => {
-            this._update_scroll_action_warning();
-        });
-        this._update_scroll_action_warning();
-
-        this._builder.get_object('scroll_action_combo').set_active(this._settings.get_enum('scroll-action'));
-        this._builder.get_object('scroll_action_combo').connect('changed', widget => {
-            this._settings.set_enum('scroll-action', widget.get_active());
-        });
-
-        this._builder.get_object('shift_click_action_combo').connect('changed', widget => {
-            this._settings.set_enum('shift-click-action', widget.get_active());
-        });
-
-        this._builder.get_object('middle_click_action_combo').connect('changed', widget => {
-            this._settings.set_enum('middle-click-action', widget.get_active());
-        });
-        this._builder.get_object('shift_middle_click_action_combo').connect('changed', widget => {
-            this._settings.set_enum('shift-middle-click-action', widget.get_active());
-        });
-
-        // Create dialog for number overlay options
-        this._builder.get_object('overlay_button').connect('clicked', () => {
-            const dialog = new Gtk.Dialog({
-                title: __('Show dock and application numbers'),
-                transient_for: this.page.get_root(),
-                use_header_bar: true,
-                modal: true,
-            });
-
-            // GTK+ leaves positive values for application-defined response ids.
-            // Use +1 for the reset action
-            dialog.add_button(__('Reset to defaults'), 1);
-
-            const box = this._builder.get_object('box_overlay_shortcut');
-            dialog.get_content_area().append(box);
-
-            this._builder.get_object('overlay_switch').set_active(
-                this._settings.get_boolean('hotkeys-overlay'));
-            this._builder.get_object('show_dock_switch').set_active(
-                this._settings.get_boolean('hotkeys-show-dock'));
-
-            // We need to update the shortcut 'strv' when the text is modified
-            this._settings.connect('changed::shortcut-text', () => setShortcut(this._settings));
-            this._settings.bind('shortcut-text',
-                this._builder.get_object('shortcut_entry'),
-                'text',
-                Gio.SettingsBindFlags.DEFAULT);
-
-            this._settings.bind('hotkeys-overlay',
-                this._builder.get_object('overlay_switch'),
-                'active',
-                Gio.SettingsBindFlags.DEFAULT);
-            this._settings.bind('hotkeys-show-dock',
-                this._builder.get_object('show_dock_switch'),
-                'active',
-                Gio.SettingsBindFlags.DEFAULT);
-            this._settings.bind('shortcut-timeout',
-                this._builder.get_object('timeout_spinbutton'),
-                'value',
-                Gio.SettingsBindFlags.DEFAULT);
-
-            dialog.connect('response', (_, id) => {
-                if (id === 1) {
-                    // restore default settings for the relevant keys
-                    const keys = ['shortcut-text', 'hotkeys-overlay',
-                        'hotkeys-show-dock', 'shortcut-timeout'];
-                    keys.forEach(function (val) {
-                        this._settings.set_value(val, this._settings.get_default_value(val));
-                    }, this);
-                } else {
-                    // remove the settings box so it doesn't get destroyed;
-                    dialog.get_content_area().remove(box);
-                    dialog.destroy();
-                }
-            });
-
-            dialog.present();
-        });
-
-        // Create dialog for middle-click options
-        this._builder.get_object('middle_click_options_button').connect('clicked', () => {
-            const dialog = new Gtk.Dialog({
-                title: __('Customize middle-click behavior'),
-                transient_for: this.page.get_root(),
-                use_header_bar: true,
-                modal: true,
-            });
-
-            // GTK+ leaves positive values for application-defined response ids.
-            // Use +1 for the reset action
-            dialog.add_button(__('Reset to defaults'), 1);
-
-            const box = this._builder.get_object('box_middle_click_options');
-            dialog.get_content_area().append(box);
-
-            this._builder.get_object('shift_click_action_combo').set_active(
-                this._settings.get_enum('shift-click-action'));
-
-            this._builder.get_object('middle_click_action_combo').set_active(
-                this._settings.get_enum('middle-click-action'));
-
-            this._builder.get_object('shift_middle_click_action_combo').set_active(
-                this._settings.get_enum('shift-middle-click-action'));
-
-            this._settings.bind('shift-click-action',
-                this._builder.get_object('shift_click_action_combo'),
-                'active-id',
-                Gio.SettingsBindFlags.DEFAULT);
-            this._settings.bind('middle-click-action',
-                this._builder.get_object('middle_click_action_combo'),
-                'active-id',
-                Gio.SettingsBindFlags.DEFAULT);
-            this._settings.bind('shift-middle-click-action',
-                this._builder.get_object('shift_middle_click_action_combo'),
-                'active-id',
-                Gio.SettingsBindFlags.DEFAULT);
-
-            dialog.connect('response', (_, id) => {
-                if (id === 1) {
-                    // restore default settings for the relevant keys
-                    const keys = ['shift-click-action', 'middle-click-action', 'shift-middle-click-action'];
-                    keys.forEach(function (val) {
-                        this._settings.set_value(val, this._settings.get_default_value(val));
-                    }, this);
-                    this._builder.get_object('shift_click_action_combo').set_active(
-                        this._settings.get_enum('shift-click-action'));
-                    this._builder.get_object('middle_click_action_combo').set_active(
-                        this._settings.get_enum('middle-click-action'));
-                    this._builder.get_object('shift_middle_click_action_combo').set_active(
-                        this._settings.get_enum('shift-middle-click-action'));
-                } else {
-                    // remove the settings box so it doesn't get destroyed;
-                    dialog.get_content_area().remove(box);
-                    dialog.destroy();
-                }
-            });
-
-            dialog.present();
-        });
-
-        // Appearance Panel
-
-        this._settings.bind('apply-custom-theme',
-            this._builder.get_object('customize_theme'),
-            'sensitive',
-            Gio.SettingsBindFlags.INVERT_BOOLEAN | Gio.SettingsBindFlags.GET);
-        this._settings.bind('apply-custom-theme',
-            this._builder.get_object('builtin_theme_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('custom-theme-shrink',
-            this._builder.get_object('shrink_dash_switch'),
-            'active',
-            Gio.SettingsBindFlags.DEFAULT);
-
-        // Running indicators
-        this._builder.get_object('running_indicators_combo').set_active(
-            this._settings.get_enum('running-indicator-style')
-        );
-        this._builder.get_object('running_indicators_combo').connect(
-            'changed',
-            widget => {
-                this._settings.set_enum('running-indicator-style', widget.get_active());
-            }
-        );
-
-        if (this._settings.get_enum('running-indicator-style') === RunningIndicatorStyle.DEFAULT)
-            this._builder.get_object('running_indicators_advance_settings_button').set_sensitive(false);
-
-        this._settings.connect('changed::running-indicator-style', () => {
-            if (this._settings.get_enum('running-indicator-style') === RunningIndicatorStyle.DEFAULT)
-                this._builder.get_object('running_indicators_advance_settings_button').set_sensitive(false);
-            else
-                this._builder.get_object('running_indicators_advance_settings_button').set_sensitive(true);
-        });
-
-        // Create dialog for running indicators advanced settings
-        this._builder.get_object('running_indicators_advance_settings_button').connect('clicked', () => {
-            const dialog = new Gtk.Dialog({
-                title: __('Customize running indicators'),
-                transient_for: this.page.get_root(),
-                use_header_bar: true,
-                modal: true,
-            });
-
-            const box = this._builder.get_object('running_dots_advance_settings_box');
-            dialog.get_content_area().append(box);
-
-            this._settings.bind('running-indicator-dominant-color',
-                this._builder.get_object('dominant_color_switch'),
-                'active',
-                Gio.SettingsBindFlags.DEFAULT);
-
-            this._settings.bind('custom-theme-customize-running-dots',
-                this._builder.get_object('dot_style_switch'),
-                'active',
-                Gio.SettingsBindFlags.DEFAULT);
-            this._settings.bind('custom-theme-customize-running-dots',
-                this._builder.get_object('dot_style_settings_box'),
-                'sensitive', Gio.SettingsBindFlags.DEFAULT);
-
-            const rgba = new Gdk.RGBA();
-            rgba.parse(this._settings.get_string('custom-theme-running-dots-color'));
-            this._builder.get_object('dot_color_colorbutton').set_rgba(rgba);
-
-            this._builder.get_object('dot_color_colorbutton').connect('notify::rgba', button => {
-                const css = button.rgba.to_string();
-
-                this._settings.set_string('custom-theme-running-dots-color', css);
-            });
-
-            rgba.parse(this._settings.get_string('custom-theme-running-dots-border-color'));
-            this._builder.get_object('dot_border_color_colorbutton').set_rgba(rgba);
-
-            this._builder.get_object('dot_border_color_colorbutton').connect('notify::rgba', button => {
-                const css = button.rgba.to_string();
-
-                this._settings.set_string('custom-theme-running-dots-border-color', css);
-            });
-
-            this._settings.bind('custom-theme-running-dots-border-width',
-                this._builder.get_object('dot_border_width_spin_button'),
-                'value',
-                Gio.SettingsBindFlags.DEFAULT);
-
-
-            dialog.connect('response', () => {
-                // remove the settings box so it doesn't get destroyed;
-                dialog.get_content_area().remove(box);
-                dialog.destroy();
-            });
-
-            dialog.present();
-        });
-
-        this._settings.bind('custom-background-color',
-            this._builder.get_object('custom_background_color_switch'),
-            'active', Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('custom-background-color',
-            this._builder.get_object('custom_background_color'),
-            'sensitive', Gio.SettingsBindFlags.DEFAULT);
-
-        const rgba = new Gdk.RGBA();
-        rgba.parse(this._settings.get_string('background-color'));
-        this._builder.get_object('custom_background_color').set_rgba(rgba);
-
-        this._builder.get_object('custom_background_color').connect('notify::rgba', button => {
-            const css = button.rgba.to_string();
-
-            this._settings.set_string('background-color', css);
-        });
-
-        // Opacity
-        this._builder.get_object('customize_opacity_combo').set_active_id(
-            this._settings.get_enum('transparency-mode').toString()
-        );
-        this._builder.get_object('customize_opacity_combo').connect(
-            'changed',
-            widget => {
-                this._settings.set_enum('transparency-mode', parseInt(widget.get_active_id()));
-            }
-        );
-
-        const customOpacityScale = this._builder.get_object('custom_opacity_scale');
-        customOpacityScale.set_value(this._settings.get_double('background-opacity'));
-        customOpacityScale.set_format_value_func((_, value) => {
-            return `${Math.round(value * 100)}%`;
-        });
-
-        if (this._settings.get_enum('transparency-mode') !== TransparencyMode.FIXED)
-            this._builder.get_object('custom_opacity_scale').set_sensitive(false);
-
-        this._settings.connect('changed::transparency-mode', () => {
-            if (this._settings.get_enum('transparency-mode') !== TransparencyMode.FIXED)
-                this._builder.get_object('custom_opacity_scale').set_sensitive(false);
-            else
-                this._builder.get_object('custom_opacity_scale').set_sensitive(true);
-        });
-
-        if (this._settings.get_enum('transparency-mode') !== TransparencyMode.DYNAMIC)
-            this._builder.get_object('dynamic_opacity_button').set_sensitive(false);
-
-
-        this._settings.connect('changed::transparency-mode', () => {
-            if (this._settings.get_enum('transparency-mode') !== TransparencyMode.DYNAMIC)
-                this._builder.get_object('dynamic_opacity_button').set_sensitive(false);
-
-            else
-                this._builder.get_object('dynamic_opacity_button').set_sensitive(true);
-        });
-
-        // Create dialog for transparency advanced settings
-        this._builder.get_object('dynamic_opacity_button').connect('clicked', () => {
-            const dialog = new Gtk.Dialog({
-                title: __('Customize opacity'),
-                transient_for: this.page.get_root(),
-                use_header_bar: true,
-                modal: true,
-            });
-
-            const box = this._builder.get_object('advanced_transparency_dialog');
-            dialog.get_content_area().append(box);
-
-            this._settings.bind(
-                'customize-alphas',
-                this._builder.get_object('customize_alphas_switch'),
-                'active',
-                Gio.SettingsBindFlags.DEFAULT
-            );
-            this._settings.bind(
-                'customize-alphas',
-                this._builder.get_object('min_alpha_scale'),
-                'sensitive',
-                Gio.SettingsBindFlags.DEFAULT
-            );
-            this._settings.bind(
-                'customize-alphas',
-                this._builder.get_object('max_alpha_scale'),
-                'sensitive',
-                Gio.SettingsBindFlags.DEFAULT
-            );
-
-            const minAlphaScale = this._builder.get_object('min_alpha_scale');
-            const maxAlphaScale = this._builder.get_object('max_alpha_scale');
-            minAlphaScale.set_value(
-                this._settings.get_double('min-alpha')
-            );
-            minAlphaScale.set_format_value_func((_, value) => {
-                return `${Math.round(value * 100)} %`;
-            });
-            maxAlphaScale.set_format_value_func((_, value) => {
-                return `${Math.round(value * 100)} %`;
-            });
-
-            maxAlphaScale.set_value(
-                this._settings.get_double('max-alpha')
-            );
-
-            dialog.connect('response', () => {
-                // remove the settings box so it doesn't get destroyed;
-                dialog.get_content_area().remove(box);
-                dialog.destroy();
-            });
-
-            dialog.present();
-        });
-
-
-        this._settings.bind('unity-backlit-items',
-            this._builder.get_object('unity_backlit_items_switch'),
-            'active', Gio.SettingsBindFlags.DEFAULT
-        );
-        this._settings.bind('apply-glossy-effect',
-            this._builder.get_object('apply_gloss_effect_checkbutton'),
-            'active', Gio.SettingsBindFlags.DEFAULT
-        );
-        this._settings.bind('unity-backlit-items',
-            this._builder.get_object('apply_gloss_effect_checkbutton'),
-            'sensitive',
-            Gio.SettingsBindFlags.DEFAULT
-        );
-
-        this._settings.bind('force-straight-corner',
-            this._builder.get_object('force_straight_corner_switch'),
-            'active', Gio.SettingsBindFlags.DEFAULT);
-
-        this._settings.bind('disable-overview-on-startup',
-            this._builder.get_object('show_overview_on_startup_switch'),
-            'active', Gio.SettingsBindFlags.INVERT_BOOLEAN);
-
-        // About Panel
-
-        this._builder.get_object('extension_version').set_label(
-            `${this._extensionPreferences.metadata.version}`);
-    }
-});
-
-export default class DockPreferences extends ExtensionPreferences {
-    fillPreferencesWindow(window) {
-        const settings = new DockSettings(this);
-        window.add(settings.page);
-    }
-}

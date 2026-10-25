@@ -8,7 +8,6 @@ BASE_MODULES = extension.js \
                $(NULL)
 
 EXTRA_MODULES = \
-                appSpread.js \
                 dash.js \
                 docking.js \
                 appIcons.js \
@@ -28,13 +27,9 @@ EXTRA_MODULES = \
                 utils.js \
                 dbusmenuUtils.js \
                 desktopIconsIntegration.js \
-                Settings.ui \
                 $(NULL)
 
-EXTRA_MEDIA = logo.svg \
-              glossy.svg \
-              highlight_stacked_bg.svg \
-              highlight_stacked_bg_h.svg \
+EXTRA_MEDIA = glossy.svg \
               $(NULL)
 
 MSGSRC = $(wildcard po/*.po)

@@ -47,13 +47,9 @@ export class AppIconIndicator {
 
         // Choose the style for the running indicators
         let runningIndicator = null;
-        let runningIndicatorStyle;
 
         const {settings} = Docking.DockManager;
-        if (settings.applyCustomTheme)
-            runningIndicatorStyle = RunningIndicatorStyle.DOTS;
-        else
-            ({runningIndicatorStyle} = settings);
+        const {runningIndicatorStyle} = settings;
 
         if (settings.showIconsEmblems &&
             !Docking.DockManager.getDefault().notificationsMonitor.dndMode) {
@@ -328,8 +324,7 @@ class RunningIndicatorDots extends RunningIndicatorBase {
         super.update();
 
         // Enable / Disable the backlight of running apps
-        if (!Docking.DockManager.settings.applyCustomTheme &&
-            Docking.DockManager.settings.unityBacklitItems) {
+        if (Docking.DockManager.settings.unityBacklitItems) {
             const [icon] = this._source._iconContainer.get_children();
             icon.set_style(
                 Docking.DockManager.settings.applyGlossyEffect
@@ -360,43 +355,41 @@ class RunningIndicatorDots extends RunningIndicatorBase {
         this._bodyColor = themeNode.get_background_color();
 
         const {settings} = Docking.DockManager;
-        if (!settings.applyCustomTheme) {
-            // Adjust for the backlit case
-            const Color = Clutter.Color ?? Cogl.Color;
+        // Adjust for the backlit case
+        const Color = Clutter.Color ?? Cogl.Color;
 
-            if (settings.unityBacklitItems) {
-                // Use dominant color for dots too if the backlit is enables
-                const colorPalette = this._dominantColorExtractor._getColorPalette();
+        if (settings.unityBacklitItems) {
+            // Use dominant color for dots too if the backlit is enables
+            const colorPalette = this._dominantColorExtractor._getColorPalette();
 
-                // Slightly adjust the styling
-                this._borderWidth = 2;
+            // Slightly adjust the styling
+            this._borderWidth = 2;
 
-                if (colorPalette) {
-                    [, this._borderColor] = Color.from_string(colorPalette.lighter);
-                    [, this._bodyColor] = Color.from_string(colorPalette.darker);
-                } else {
-                    // Fallback
-                    [, this._borderColor] = Color.from_string('white');
-                    [, this._bodyColor] = Color.from_string('gray');
-                }
+            if (colorPalette) {
+                [, this._borderColor] = Color.from_string(colorPalette.lighter);
+                [, this._bodyColor] = Color.from_string(colorPalette.darker);
+            } else {
+                // Fallback
+                [, this._borderColor] = Color.from_string('white');
+                [, this._bodyColor] = Color.from_string('gray');
             }
+        }
 
-            // Apply dominant color if requested
-            if (settings.runningIndicatorDominantColor) {
-                const colorPalette = this._dominantColorExtractor._getColorPalette();
-                if (colorPalette)
-                    [, this._bodyColor] = Color.from_string(colorPalette.original);
-                else
-                    // Fallback
-                    [, this._bodyColor] = Color.from_string(settings.customThemeRunningDotsColor);
-            }
+        // Apply dominant color if requested
+        if (settings.runningIndicatorDominantColor) {
+            const colorPalette = this._dominantColorExtractor._getColorPalette();
+            if (colorPalette)
+                [, this._bodyColor] = Color.from_string(colorPalette.original);
+            else
+                // Fallback
+                [, this._bodyColor] = Color.from_string(settings.customThemeRunningDotsColor);
+        }
 
-            // Finally, use customize style if requested
-            if (settings.customThemeCustomizeRunningDots) {
-                [, this._borderColor] = Color.from_string(settings.customThemeRunningDotsBorderColor);
-                this._borderWidth = settings.customThemeRunningDotsBorderWidth;
-                [, this._bodyColor] =  Color.from_string(settings.customThemeRunningDotsColor);
-            }
+        // Finally, use customize style if requested
+        if (settings.customThemeCustomizeRunningDots) {
+            [, this._borderColor] = Color.from_string(settings.customThemeRunningDotsBorderColor);
+            this._borderWidth = settings.customThemeRunningDotsBorderWidth;
+            [, this._bodyColor] =  Color.from_string(settings.customThemeRunningDotsColor);
         }
 
         // Define the radius as an arbitrary size, but keep large enough to account

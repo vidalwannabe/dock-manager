@@ -56,8 +56,6 @@ class DockDashItemContainer extends Dash.DashItemContainer {
             this.yExpand = false;
 
         this.label?.add_style_class_name(Theming.PositionStyleClass[position]);
-        if (Docking.DockManager.settings.customThemeShrink)
-            this.label?.add_style_class_name('shrink');
     }
 
     showLabel() {
@@ -846,24 +844,12 @@ export const DockDash = GObject.registerClass({
         }
 
         this._signalsHandler.removeWithLabel(Labels.SHOW_MOUNTS);
-        if (dockManager.removables) {
-            this._signalsHandler.addWithLabel(Labels.SHOW_MOUNTS,
-                dockManager.removables, 'changed', this._queueRedisplay.bind(this));
-            dockManager.removables.getApps().forEach(removable => {
-                if (!newApps.includes(removable))
-                    newApps.push(removable);
-            });
-        } else {
-            oldApps = oldApps.filter(app => !app.location || app.isTrash);
-        }
-
-        if (dockManager.trash) {
-            const trashApp = dockManager.trash.getApp();
-            if (!newApps.includes(trashApp))
-                newApps.push(trashApp);
-        } else {
-            oldApps = oldApps.filter(app => !app.isTrash);
-        }
+        this._signalsHandler.addWithLabel(Labels.SHOW_MOUNTS,
+            dockManager.removables, 'changed', this._queueRedisplay.bind(this));
+        dockManager.removables.getApps().forEach(removable => {
+            if (!newApps.includes(removable))
+                newApps.push(removable);
+        });
 
         // Temporary remove the separator so that we don't compute to position icons
         const oldSeparatorPos = this._box.get_children().indexOf(this._separator);
@@ -1002,35 +988,7 @@ export const DockDash = GObject.registerClass({
 
         addedItems.forEach(({item}) => item.show(animate));
 
-        // This will update the size, and the corresponding number for each icon
-        this._updateNumberOverlay();
-
         this.updateShowAppsButton();
-    }
-
-    _updateNumberOverlay() {
-        const appIcons = this.getAppIcons();
-        let counter = 1;
-        appIcons.forEach(icon => {
-            if (counter < 10) {
-                icon.setNumberOverlay(counter);
-                counter++;
-            } else if (counter === 10) {
-                icon.setNumberOverlay(0);
-                counter++;
-            } else {
-                // No overlay after 10
-                icon.setNumberOverlay(-1);
-            }
-            icon.updateNumberOverlay();
-        });
-    }
-
-    toggleNumberOverlay(activate) {
-        const appIcons = this.getAppIcons();
-        appIcons.forEach(icon => {
-            icon.toggleNumberOverlay(activate);
-        });
     }
 
     _initializeIconSize(maxSize) {
@@ -1079,12 +1037,6 @@ export const DockDash = GObject.registerClass({
         return this._showAppsIcon.toggleButton;
     }
 
-    showShowAppsButton() {
-        this._showAppsIcon.visible = true;
-        this._showAppsIcon.show(true);
-        this.updateShowAppsButton();
-    }
-
     hideShowAppsButton() {
         this._showAppsIcon.visible = false;
     }
@@ -1121,8 +1073,7 @@ export const DockDash = GObject.registerClass({
 
         const {settings} = Docking.DockManager;
         const notifiedProperties = [];
-        const showAppsContainer = settings.showAppsAlwaysInTheEdge || !settings.dockExtended
-            ? this._dashContainer : this._boxContainer;
+        const showAppsContainer = settings.dockExtended ? this._boxContainer : this._dashContainer;
         const needsFirstLastChildWorkaround = Config.PACKAGE_VERSION.split('.')[0] < 49;
 
         if (needsFirstLastChildWorkaround) {
@@ -1131,17 +1082,13 @@ export const DockDash = GObject.registerClass({
                 (_obj, pspec) => notifiedProperties.push(pspec.name));
         }
 
+        // Show Applications comes first: on the left of a bottom or top dock, on top of a
+        // side dock.
         if (this._showAppsIcon.get_parent() !== showAppsContainer) {
             this._showAppsIcon.get_parent()?.remove_child(this._showAppsIcon);
-
-            if (Docking.DockManager.settings.showAppsAtTop)
-                showAppsContainer.insert_child_below(this._showAppsIcon, null);
-            else
-                showAppsContainer.insert_child_above(this._showAppsIcon, null);
-        } else if (settings.showAppsAtTop) {
-            showAppsContainer.set_child_below_sibling(this._showAppsIcon, null);
+            showAppsContainer.insert_child_below(this._showAppsIcon, null);
         } else {
-            showAppsContainer.set_child_above_sibling(this._showAppsIcon, null);
+            showAppsContainer.set_child_below_sibling(this._showAppsIcon, null);
         }
 
         if (needsFirstLastChildWorkaround) {

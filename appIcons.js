@@ -5,7 +5,6 @@ import {
     Gio,
     GLib,
     GObject,
-    Meta,
     Mtk,
     Shell,
     St,
@@ -49,35 +48,9 @@ const Labels = Object.freeze({
     URGENT_WINDOWS: Symbol('urgent-windows'),
 });
 
-const clickAction = Object.freeze({
-    SKIP: 0,
-    MINIMIZE: 1,
-    LAUNCH: 2,
-    CYCLE_WINDOWS: 3,
-    MINIMIZE_OR_OVERVIEW: 4,
-    PREVIEWS: 5,
-    MINIMIZE_OR_PREVIEWS: 6,
-    FOCUS_OR_PREVIEWS: 7,
-    FOCUS_OR_APP_SPREAD: 8,
-    FOCUS_MINIMIZE_OR_PREVIEWS: 9,
-    FOCUS_MINIMIZE_OR_APP_SPREAD: 10,
-    QUIT: 11,
-});
-
-const scrollAction = Object.freeze({
-    DO_NOTHING: 0,
-    CYCLE_WINDOWS: 1,
-    SWITCH_WORKSPACE: 2,
-});
-
 // module "Dash" did not export DASH_ITEM_LABEL_SHOW_TIME, so let's define it.
 const DASH_ITEM_LABEL_SHOW_TIME = Dash.DASH_ITEM_LABEL_SHOW_TIME ?? 150;
 
-let recentlyClickedAppLoopId = 0;
-let recentlyClickedApp = null;
-let recentlyClickedAppWindows = null;
-let recentlyClickedAppIndex = 0;
-let recentlyClickedAppMonitor = -1;
 
 /**
  * Extend AppIcon
@@ -207,7 +180,6 @@ export const DockAbstractAppIcon = GObject.registerClass({
         this._progress = 0;
 
         [
-            'apply-custom-theme',
             'running-indicator-style',
             'show-icons-emblems',
             'show-icons-notifications-counter',
@@ -228,33 +200,12 @@ export const DockAbstractAppIcon = GObject.registerClass({
         });
 
         this._updateState();
-        this._numberOverlay();
-
-        this._previewMenuManager = null;
-        this._previewMenu = null;
-
-        // This requires GNOME 49
-        if (Clutter.ClickGesture) {
-            const doubleClickGesture = new Clutter.ClickGesture({nClicksRequired: 2});
-            doubleClickGesture.connect('recognize', () => {
-                this._activate({
-                    button: doubleClickGesture.get_button(),
-                    modifiers: doubleClickGesture.get_state(),
-                    clickCount: doubleClickGesture.get_n_presses(),
-                });
-            });
-            this.add_action(doubleClickGesture);
-            this._doubleClickGesture = doubleClickGesture;
-        }
     }
 
     _onDestroy() {
         super._onDestroy();
 
         delete this._menu;
-
-        this._doubleClickGesture?.cancel();
-        delete this._doubleClickGesture;
     }
 
     ownsWindow(window) {
@@ -264,64 +215,6 @@ export const DockAbstractAppIcon = GObject.registerClass({
     _onWindowEntered(metaScreen, monitorIndex, metaWin) {
         if (this.ownsWindow(metaWin))
             this._updateWindows();
-    }
-
-    vfunc_scroll_event(scrollEvent) {
-        const {settings} = Docking.DockManager;
-        const isEnabled = settings.scrollAction === scrollAction.CYCLE_WINDOWS;
-        if (!isEnabled)
-            return Clutter.EVENT_PROPAGATE;
-
-        // We only activate windows of running applications, i.e. we never open new windows
-        // We check if the app is running, and that the # of windows is > 0 in
-        // case we use workspace isolation,
-        if (!this.running)
-            return Clutter.EVENT_PROPAGATE;
-
-        if (this._optionalScrollCycleWindowsDeadTimeId) {
-            return Clutter.EVENT_PROPAGATE;
-        } else {
-            this._optionalScrollCycleWindowsDeadTimeId = GLib.timeout_add(
-                GLib.PRIORITY_DEFAULT, 250, () => {
-                    this._optionalScrollCycleWindowsDeadTimeId = 0;
-                });
-        }
-
-        let direction = null;
-
-        switch (scrollEvent.direction) {
-        case Clutter.ScrollDirection.UP:
-            direction = Meta.MotionDirection.UP;
-            break;
-        case Clutter.ScrollDirection.DOWN:
-            direction = Meta.MotionDirection.DOWN;
-            break;
-        case Clutter.ScrollDirection.SMOOTH: {
-            const [, dy] = Clutter.get_current_event().get_scroll_delta();
-            if (dy < 0)
-                direction = Meta.MotionDirection.UP;
-            else if (dy > 0)
-                direction = Meta.MotionDirection.DOWN;
-        }
-            break;
-        }
-
-        if (!Main.overview.visible) {
-            const reversed = direction === Meta.MotionDirection.UP;
-            if (this.focused && !this._urgentWindows.size) {
-                this._cycleThroughWindows(reversed);
-            } else {
-                // Activate the first window
-                const windows = this.getInterestingWindows();
-                if (windows.length > 0) {
-                    const [w] = windows;
-                    Main.activateWindow(w);
-                }
-            }
-        } else {
-            this.app.activate();
-        }
-        return Clutter.EVENT_STOP;
     }
 
     _updateWindows() {
@@ -512,267 +405,35 @@ export const DockAbstractAppIcon = GObject.registerClass({
         this._activate({
             button,
             modifiers: event?.get_state() ?? 0,
-            clickCount: event?.get_click_count?.() ?? 1,
         });
     }
 
-    _activate({button, modifiers, clickCount = 1}) {
+    // Primary click on a running application focuses it, or minimizes all its windows
+    // when it is focused already; Shift+click minimizes all its windows; middle click opens
+    // a new window. Any other click is GNOME's own.
+    _activate({button, modifiers}) {
         // Only consider SHIFT and CONTROL as modifiers (exclude SUPER, CAPS-LOCK, etc.)
         modifiers &= Clutter.ModifierType.SHIFT_MASK | Clutter.ModifierType.CONTROL_MASK;
-
-        // We don't change the CTRL-click behavior: in such case we just chain
-        // up the parent method and return.
-        if (modifiers & Clutter.ModifierType.CONTROL_MASK) {
-            // Keep default behavior: launch new window
-            // By calling the parent method I make it compatible
-            // with other extensions tweaking ctrl + click
+        const isPrimaryClick = button === 1 && !(modifiers & Clutter.ModifierType.CONTROL_MASK);
+        const isMiddleClick = button === 2 && !modifiers;
+        if (!isPrimaryClick && !isMiddleClick) {
             super.activate(button);
             return;
         }
 
-        // We check what type of click we have and if the modifier SHIFT is
-        // being used. We then define what buttonAction should be for this
-        // event.
-        let buttonAction = 0;
-        const {settings} = Docking.DockManager;
-        if (button && button === 2) {
-            if (modifiers & Clutter.ModifierType.SHIFT_MASK)
-                buttonAction = settings.shiftMiddleClickAction;
-            else
-                buttonAction = settings.middleClickAction;
-        } else if (button && button === 1) {
-            if (modifiers & Clutter.ModifierType.SHIFT_MASK)
-                buttonAction = settings.shiftClickAction;
-            else
-                buttonAction = settings.clickAction;
-        }
-
-        switch (buttonAction) {
-        case clickAction.FOCUS_OR_APP_SPREAD:
-            if (!Docking.DockManager.getDefault().appSpread.supported)
-                buttonAction = clickAction.FOCUS_OR_PREVIEWS;
-            break;
-
-        case clickAction.FOCUS_MINIMIZE_OR_APP_SPREAD:
-            if (!Docking.DockManager.getDefault().appSpread.supported)
-                buttonAction = clickAction.FOCUS_MINIMIZE_OR_PREVIEWS;
-            break;
-        }
-
-        // We check if the app is running, and that the # of windows is > 0 in
-        // case we use workspace isolation.
-        const windows = this.getInterestingWindows();
-
-        // Some action modes (e.g. MINIMIZE_OR_OVERVIEW) require overview to remain open
-        // This variable keeps track of this
-        let shouldHideOverview = true;
-
-        // We customize the action only when the application is already running
-        if (this.running) {
-            const hasUrgentWindows = !!this._urgentWindows.size;
-            const singleOrUrgentWindows = windows.length === 1 || hasUrgentWindows;
-            switch (buttonAction) {
-            case clickAction.MINIMIZE:
-                // In overview just activate the app, unless the action is explicitly
-                // requested with a keyboard modifier
-                if (!Main.overview.visible || modifiers) {
-                    // If we have button=2 or a modifier, allow minimization even if
-                    // the app is not focused
-                    if (this.focused && !hasUrgentWindows || button === 2 ||
-                        modifiers & Clutter.ModifierType.SHIFT_MASK) {
-                        // minimize all windows on double click and always in
-                        // the case of primary click without additional modifiers
-                        const allWindows = (button === 1 && !modifiers) || clickCount > 1;
-                        this._minimizeWindow(allWindows);
-                    } else {
-                        this._activateAllWindows();
-                    }
-                } else {
-                    const [w] = windows;
-                    Main.activateWindow(w);
-                }
-                break;
-
-            case clickAction.MINIMIZE_OR_OVERVIEW:
-                // When a single window is present, toggle minimization
-                // If only one windows is present toggle minimization, but
-                // only when triggered with the simple click action
-                // (no modifiers, no middle click).
-                if (singleOrUrgentWindows && !modifiers && button === 1) {
-                    const [w] = windows;
-                    if (this.focused) {
-                        if (buttonAction !== clickAction.FOCUS_OR_APP_SPREAD) {
-                            // Window is raised, minimize it
-                            this._minimizeWindow(w);
-                        }
-                    } else {
-                        // Window is minimized, raise it
-                        Main.activateWindow(w);
-                    }
-                    // Launch overview when multiple windows are present
-                    // TODO: only show current app windows when gnome shell API will allow it
-                } else {
-                    shouldHideOverview = false;
-                    Main.overview.toggle();
-                }
-                break;
-
-            case clickAction.CYCLE_WINDOWS:
-                if (!Main.overview.visible) {
-                    if (this.focused && !hasUrgentWindows) {
-                        this._cycleThroughWindows();
-                    } else {
-                        // Activate the first window
-                        const [w] = windows;
-                        Main.activateWindow(w);
-                    }
-                } else {
-                    this.app.activate();
-                }
-                break;
-
-            case clickAction.FOCUS_OR_PREVIEWS:
-                if (this.focused && !hasUrgentWindows &&
-                    (windows.length > 1 || modifiers || button !== 1)) {
-                    this._windowPreviews();
-                } else {
-                    // Activate the first window
-                    const [w] = windows;
-                    Main.activateWindow(w);
-                }
-                break;
-
-            case clickAction.FOCUS_MINIMIZE_OR_PREVIEWS:
-                if (this.focused && !hasUrgentWindows) {
-                    if (windows.length > 1 || modifiers || button !== 1)
-                        this._windowPreviews();
-                    else if (!Main.overview.visible)
-                        this._minimizeWindow();
-                } else {
-                    // Activate the first window
-                    const [w] = windows;
-                    Main.activateWindow(w);
-                }
-                break;
-
-            case clickAction.LAUNCH:
-                this.launchNewWindow();
-                break;
-
-            case clickAction.PREVIEWS:
-                if (!Main.overview.visible) {
-                    // If only one windows is present just switch to it,
-                    // but only when triggered with the simple click action
-                    // (no modifiers, no middle click).
-                    if (singleOrUrgentWindows && !modifiers && button === 1) {
-                        const [w] = windows;
-                        Main.activateWindow(w);
-                    } else {
-                        this._windowPreviews();
-                    }
-                } else {
-                    this.app.activate();
-                }
-                break;
-
-            case clickAction.MINIMIZE_OR_PREVIEWS:
-                // When a single window is present, toggle minimization
-                // If only one windows is present toggle minimization, but only
-                // when triggered with the standard click action (no modifiers,
-                // no middle click).
-                if (!Main.overview.visible) {
-                    if (singleOrUrgentWindows && !modifiers && button === 1) {
-                        const [w] = windows;
-                        if (this.focused) {
-                            // Window is raised, minimize it
-                            this._minimizeWindow(w);
-                        } else {
-                            // Window is minimized, raise it
-                            Main.activateWindow(w);
-                        }
-                    } else {
-                        // Launch previews when multiple windows are present
-                        this._windowPreviews();
-                    }
-                } else {
-                    this.app.activate();
-                }
-                break;
-
-            case clickAction.FOCUS_OR_APP_SPREAD:
-                if (this.focused && !singleOrUrgentWindows && !modifiers && button === 1) {
-                    shouldHideOverview = false;
-                    this._doubleClickGesture?.cancel();
-                    Docking.DockManager.getDefault().appSpread.toggle(this.app);
-                } else {
-                    // Activate the first window
-                    Main.activateWindow(windows[0]);
-                }
-                break;
-
-            case clickAction.FOCUS_MINIMIZE_OR_APP_SPREAD:
-                if (this.focused && !singleOrUrgentWindows && !modifiers && button === 1) {
-                    shouldHideOverview = false;
-                    this._doubleClickGesture?.cancel();
-                    Docking.DockManager.getDefault().appSpread.toggle(this.app);
-                } else if (!this.focused) {
-                    // Activate the first window
-                    Main.activateWindow(windows[0]);
-                } else {
-                    this._minimizeWindow();
-                }
-                break;
-
-            case clickAction.QUIT:
-                this.closeAllWindows();
-                break;
-
-            case clickAction.SKIP:
-                Main.activateWindow(windows[0]);
-                break;
-            }
-        } else {
+        if (!this.running || isMiddleClick) {
             this.launchNewWindow();
+        } else if (modifiers & Clutter.ModifierType.SHIFT_MASK) {
+            this._minimizeWindow(true);
+        } else if (Main.overview.visible) {
+            // In the overview, a click just shows the application.
+            Main.activateWindow(this.getInterestingWindows()[0]);
+        } else if (this.focused && !this._urgentWindows.size) {
+            this._minimizeWindow(true);
+        } else {
+            this._activateAllWindows();
         }
-
-        // Hide overview except when action mode requires it
-        if (shouldHideOverview)
-            Main.overview.hide();
-    }
-
-    shouldShowTooltip() {
-        return super.shouldShowTooltip() && !this._previewMenu?.isOpen &&
-            !Docking.DockManager.settings.hideTooltip;
-    }
-
-    _windowPreviews() {
-        if (!this._previewMenu) {
-            this._previewMenuManager = new PopupMenu.PopupMenuManager(this);
-
-            this._previewMenu = new WindowPreview.WindowPreviewMenu(this);
-
-            this._previewMenuManager.addMenu(this._previewMenu);
-
-            this._previewMenu.connect('open-state-changed', (menu, isPoppedUp) => {
-                if (!isPoppedUp)
-                    this._onMenuPoppedDown();
-            });
-            const id = Main.overview.connect('hiding', () => {
-                this._previewMenu.close();
-            });
-            this._previewMenu.actor.connect('destroy', () => {
-                Main.overview.disconnect(id);
-            });
-        }
-
-        this.emit('menu-state-changed', !this._previewMenu.isOpen);
-
-        if (this._previewMenu.isOpen)
-            this._previewMenu.close();
-        else
-            this._previewMenu.popup();
-
-        return false;
+        Main.overview.hide();
     }
 
     // Try to do the right thing when attempting to launch a new window of an app. In
@@ -799,53 +460,6 @@ export const DockAbstractAppIcon = GObject.registerClass({
                 this.app.activate();
                 this.animateLaunch();
             }
-        }
-    }
-
-    _numberOverlay() {
-        // Add label for a Hot-Key visual aid
-        this._numberOverlayLabel = new St.Label();
-        this._numberOverlayBin = new St.Bin({
-            child: this._numberOverlayLabel,
-            x_align: Clutter.ActorAlign.START,
-            y_align: Clutter.ActorAlign.START,
-            x_expand: true, y_expand: true,
-        });
-        this._numberOverlayLabel.add_style_class_name('number-overlay');
-        this._numberOverlayOrder = -1;
-        this._numberOverlayBin.hide();
-
-        this._iconContainer.add_child(this._numberOverlayBin);
-    }
-
-    updateNumberOverlay() {
-        // We apply an overall scale factor that might come from a HiDPI monitor.
-        // Clutter dimensions are in physical pixels, but CSS measures are in logical
-        // pixels, so make sure to consider the scale.
-        const scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        // Set the font size to something smaller than the whole icon so it is
-        // still visible. The border radius is large to make the shape circular
-        const [minWidth_, natWidth] = this._iconContainer.get_preferred_width(-1);
-        const fontSize = Math.round(Math.max(12, 0.3 * natWidth) / scaleFactor);
-        const size = Math.round(fontSize * 1.2);
-        this._numberOverlayLabel.set_style(
-            `font-size: ${fontSize}px;` +
-           `border-radius: ${this.icon.iconSize}px;` +
-           `width: ${size}px; height: ${size}px;`
-        );
-    }
-
-    setNumberOverlay(number) {
-        this._numberOverlayOrder = number;
-        this._numberOverlayLabel.set_text(number.toString());
-    }
-
-    toggleNumberOverlay(activate) {
-        if (activate && this._numberOverlayOrder > -1) {
-            this.updateNumberOverlay();
-            this._numberOverlayBin.show();
-        } else {
-            this._numberOverlayBin.hide();
         }
     }
 
@@ -897,59 +511,6 @@ export const DockAbstractAppIcon = GObject.registerClass({
         windows.forEach(w => w.delete(time));
     }
 
-    _cycleThroughWindows(reversed) {
-        // Store for a little amount of time last clicked app and its windows
-        // since the order changes upon window interaction
-        const MEMORY_TIME = 3000;
-
-        const appWindows = this.getInterestingWindows();
-
-        if (appWindows.length < 1)
-            return;
-
-        if (recentlyClickedAppLoopId > 0)
-            GLib.source_remove(recentlyClickedAppLoopId);
-        recentlyClickedAppLoopId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, MEMORY_TIME, this._resetRecentlyClickedApp);
-
-        // If there isn't already a list of windows for the current app,
-        // or the stored list is outdated, use the current windows list.
-        const monitorIsolation = Docking.DockManager.settings.isolateMonitors;
-        if (!recentlyClickedApp ||
-            recentlyClickedApp.get_id() !== this.app.get_id() ||
-            recentlyClickedAppWindows.length !== appWindows.length ||
-            (recentlyClickedAppMonitor !== this.monitorIndex && monitorIsolation)) {
-            recentlyClickedApp = this.app;
-            recentlyClickedAppWindows = appWindows;
-            recentlyClickedAppMonitor = this.monitorIndex;
-            recentlyClickedAppIndex = 0;
-        }
-
-        if (reversed) {
-            recentlyClickedAppIndex--;
-            if (recentlyClickedAppIndex < 0)
-                recentlyClickedAppIndex = recentlyClickedAppWindows.length - 1;
-        } else {
-            recentlyClickedAppIndex++;
-        }
-        const index = recentlyClickedAppIndex % recentlyClickedAppWindows.length;
-        const window = recentlyClickedAppWindows[index];
-
-        Main.activateWindow(window);
-    }
-
-    _resetRecentlyClickedApp() {
-        if (recentlyClickedAppLoopId > 0)
-            GLib.source_remove(recentlyClickedAppLoopId);
-        recentlyClickedAppLoopId = 0;
-        recentlyClickedApp = null;
-        recentlyClickedAppWindows = null;
-        recentlyClickedAppIndex = 0;
-        recentlyClickedAppMonitor = -1;
-
-        return false;
-    }
-
     getWindows() {
         return this.app.get_windows();
     }
@@ -990,14 +551,8 @@ const DockLocationAppIcon = GObject.registerClass({
 
         super._init(app, monitorIndex, iconAnimator);
 
-        if (Docking.DockManager.settings.isolateLocations) {
-            const {windowTracker} = Docking.DockManager;
-            this._signalsHandler.add(windowTracker, 'notify::focus-app',
-                () => this._updateFocusState());
-        } else {
-            this._signalsHandler.add(global.display, 'notify::focus-window',
-                () => this._updateFocusState());
-        }
+        this._signalsHandler.add(global.display, 'notify::focus-window',
+            () => this._updateFocusState());
 
         this._signalsHandler.add(this.app, 'notify::icon', () => this.icon.update());
     }
@@ -1007,11 +562,6 @@ const DockLocationAppIcon = GObject.registerClass({
     }
 
     _updateFocusState() {
-        if (Docking.DockManager.settings.isolateLocations) {
-            super._updateFocusState();
-            return;
-        }
-
         this.focused = this.app.isFocused && this.running;
     }
 });
@@ -1452,8 +1002,6 @@ export const DockShowAppsIcon = GObject.registerClass({
             this._removeMenuTimeout(...args);
 
         this.label?.add_style_class_name(Theming.PositionStyleClass[position]);
-        if (Docking.DockManager.settings.customThemeShrink)
-            this.label?.add_style_class_name('shrink');
 
         this._menu = null;
         this._menuManager = new PopupMenu.PopupMenuManager(this);

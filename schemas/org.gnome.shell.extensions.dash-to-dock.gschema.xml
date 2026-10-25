@@ -1,24 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="gnome-shell-extensions">
-  <enum id='org.gnome.shell.extensions.dash-to-dock.clickAction'>
-    <value value='0' nick='skip'/>
-    <value value='1' nick='minimize'/>
-    <value value='2' nick='launch'/>
-    <value value='3' nick='cycle-windows'/>
-    <value value='4' nick='minimize-or-overview'/>
-    <value value='5' nick='previews'/>
-    <value value='6' nick='minimize-or-previews'/>
-    <value value='7' nick='focus-or-previews'/>
-    <value value='8' nick='focus-or-appspread'/>
-    <value value='9' nick='focus-minimize-or-previews'/>
-    <value value='10' nick='focus-minimize-or-appspread'/>
-    <value value='11' nick='quit'/>
-  </enum>
-  <enum id='org.gnome.shell.extensions.dash-to-dock.scrollAction'>
-    <value value='0' nick='do-nothing'/>
-    <value value='1' nick='cycle-windows'/>
-    <value value='2' nick='switch-workspace'/>
-  </enum>
   <!-- this is mean to Match StSide. LEFT and RIGHT actual position in reversed in
        rtl languages -->
   <enum id='org.gnome.shell.extensions.dash-to-dock.position'>
@@ -32,11 +13,6 @@
     <value value='1' nick='FOCUS_APPLICATION_WINDOWS'/>
     <value value='2' nick='MAXIMIZED_WINDOWS'/>
     <value value='3' nick='ALWAYS_ON_TOP'/>
-  </enum>
-  <enum id='org.gnome.shell.extensions.dash-to-dock.transparency-mode'>
-    <value value='0' nick='DEFAULT'/>
-    <value value='1' nick='FIXED'/>
-    <value value='3' nick='DYNAMIC'/>
   </enum>
     <enum id='org.gnome.shell.extensions.dash-to-dock.running-indicator-style'>
     <value value='0' nick='DEFAULT'/>
@@ -71,26 +47,6 @@
       <summary>Show delay</summary>
       <description>Sets the delay after the mouse left the dock before hiding it.</description>
     </key>
-    <key type="b" name="disable-overview-on-startup">
-      <default>false</default>
-      <summary>Do not show overview on startup</summary>
-      <description>Whether to show or not the overview during startup animation.</description>
-    </key>
-    <key type="b" name="custom-background-color">
-      <default>false</default>
-      <summary>Set a custom dash background background color</summary>
-      <description>Sets the color for the dash background.</description>
-    </key>
-    <key type="s" name="background-color">
-      <default>"#ffffff"</default>
-      <summary>Dash background color.</summary>
-      <description>Customize the background color of the dash.</description>
-    </key>
-    <key name="transparency-mode" enum="org.gnome.shell.extensions.dash-to-dock.transparency-mode">
-      <default>'DEFAULT'</default>
-      <summary>Transparency mode for the dock</summary>
-      <description>FIXED: constant transparency. DYNAMIC: dock takes the opaque style only when windows are close to it.</description>
-    </key>
     <key name="running-indicator-style" enum="org.gnome.shell.extensions.dash-to-dock.running-indicator-style">
       <default>'DEFAULT'</default>
       <summary>...</summary>
@@ -100,26 +56,6 @@
       <default>false</default>
       <summary>Use application icon dominant color for the indicator color</summary>
       <description></description>
-    </key>
-    <key type="b" name="customize-alphas">
-      <default>false</default>
-      <summary>Manually set the min and max opacity</summary>
-      <description>For the dynamic mode, the min/max opacity values will be given by 'min-alpha' and 'max-alpha'.</description>
-    </key>
-    <key type="d" name="min-alpha">
-      <default>0.2</default>
-      <summary>Opacity of the dash background when free-floating</summary>
-      <description>Sets the opacity of the dash background when no windows are close.</description>
-    </key>
-    <key type="d" name="max-alpha">
-      <default>0.8</default>
-      <summary>Opacity of the dash background when windows are close.</summary>
-      <description>Sets the opacity of the dash background when windows are close.</description>
-    </key>
-    <key type="d" name="background-opacity">
-      <default>0.8</default>
-      <summary>Opacity of the dash background</summary>
-      <description>Sets the opacity of the dash background  when in autohide mode.</description>
     </key>
     <key type="b" name="manualhide">
       <default>false</default>
@@ -166,11 +102,6 @@
       <summary>Dock always visible</summary>
       <description>Dock is always visible</description>
     </key>
-    <key type="b" name="scroll-switch-workspace">
-      <default>true</default>
-      <summary>Switch workspace by scrolling over the dock</summary>
-      <description>Add the possibility to switch workspace by mouse scrolling over the dock.</description>
-    </key>
     <key type="i" name="dash-max-icon-size">
       <default>48</default>
       <summary>Maximum dash icon size</summary>
@@ -185,16 +116,6 @@
       <default>false</default>
       <summary>Fixed icon size</summary>
       <description>Keep the icon size fixed by scrolling the dock.</description>
-    </key>
-    <key type="b" name="apply-custom-theme">
-      <default>false</default>
-      <summary>Apply custom theme</summary>
-      <description>Apply customization to the dash appearance</description>
-    </key>
-    <key type="b" name="custom-theme-shrink">
-      <default>false</default>
-      <summary>TODO</summary>
-      <description>TODO</description>
     </key>
     <key type="b" name="custom-theme-customize-running-dots">
       <default>false</default>
@@ -256,54 +177,10 @@
       <summary>Show favorites apps</summary>
       <description>Show or hide favorite applications icons in the dash</description>
     </key>
-    <key type="b" name="show-trash">
-      <default>true</default>
-      <summary>Show trash can</summary>
-      <description>Show or hide the trash can icon in the dash</description>
-    </key>
-    <key type="b" name="show-mounts">
-      <default>true</default>
-      <summary>Show mounted volumes and devices</summary>
-      <description>Show or hide mounted volume and device icons in the dash</description>
-    </key>
-    <key type="b" name="show-mounts-only-mounted">
-      <default>true</default>
-      <summary>Only show mounted volumes and devices</summary>
-      <description>Show or hide unmounted volume and device icons in the dash</description>
-    </key>
-    <key type="b" name="show-mounts-network">
-      <default>false</default>
-      <summary>Show network mounted volumes</summary>
-      <description>Show or hide network volumes in the dash</description>
-    </key>
-    <key type="b" name="isolate-locations">
-      <default>true</default>
-      <summary>Isolate volumes, devices and trash windows</summary>
-      <description>Consider volume, devices and trash as different application windows and not part of the file manager</description>
-    </key>
     <key type="b" name="dance-urgent-applications">
       <default>true</default>
       <summary>Wiggle urgent applications</summary>
       <description>Wiggle urgent application icons in the dash</description>
-    </key>
-    <key type="b" name="show-show-apps-button">
-      <default>true</default>
-      <summary>Show applications button</summary>
-      <description>Show applications button in the dash</description>
-    </key>
-    <key type="b" name="show-apps-at-top">
-      <default>false</default>
-      <summary>Show application button on the left</summary>
-      <description>Show application button on the left of the dash</description>
-    </key>
-    <key type="b" name="show-apps-always-in-the-edge">
-      <default>true</default>
-      <summary>Show application button on the edge when using centered panel mode</summary>
-    </key>
-    <key type="b" name="bolt-support">
-      <default>true</default>
-      <summary>Basic compatibility with bolt extensions</summary>
-      <description>Make the extension work properly when bolt extensions is enabled</description>
     </key>
     <key type="d" name="height-fraction">
       <default>0.90</default>
@@ -332,279 +209,6 @@
       <summary>Enable multi-monitor docks</summary>
       <description>Show a dock on every monitor</description>
     </key>
-    <key type="b" name="minimize-shift">
-      <default>true</default>
-      <summary>Minimize on shift+click</summary>
-    </key>
-    <key type="b" name="activate-single-window">
-      <default>true</default>
-      <summary>Activate only one window</summary>
-    </key>
-    <key name="click-action" enum="org.gnome.shell.extensions.dash-to-dock.clickAction">
-      <default>'cycle-windows'</default>
-      <summary>Action when clicking on a running app</summary>
-      <description>Set the action that is executed when clicking on the icon of a running application</description>
-    </key>
-    <key name="scroll-action" enum="org.gnome.shell.extensions.dash-to-dock.scrollAction">
-      <default>'do-nothing'</default>
-      <summary>Action when scrolling app</summary>
-      <description>Set the action that is executed when scrolling on the application icon</description>
-    </key>
-    <key name="shift-click-action" enum="org.gnome.shell.extensions.dash-to-dock.clickAction">
-      <default>'minimize'</default>
-      <summary>Action when shift+clicking on a running app</summary>
-      <description>Set the action that is executed when shift+clicking on the icon of a running application</description>
-    </key>
-    <key name="middle-click-action" enum="org.gnome.shell.extensions.dash-to-dock.clickAction">
-      <default>'launch'</default>
-      <summary>Action when clicking on a running app</summary>
-      <description>Set the action that is executed when middle-clicking on the icon of a running application</description>
-    </key>
-    <key name="shift-middle-click-action" enum="org.gnome.shell.extensions.dash-to-dock.clickAction">
-      <default>'launch'</default>
-      <summary>Action when clicking on a running app</summary>
-      <description>Set the action that is executed when shift+middle-clicking on the icon of a running application</description>
-    </key>
-    <key type="b" name="hot-keys">
-      <default>true</default>
-      <summary>Super Hot-Keys</summary>
-      <description>Launch and switch between dash items using Super+(0-9)</description>
-    </key>
-    <key type="b" name="hotkeys-show-dock">
-      <default>true</default>
-      <summary>Show the dock when using the hotkeys</summary>
-      <description>The dock will be quickly shown so that the number-overlay is visible and app activation is easier</description>
-    </key>
-    <key type="s" name="shortcut-text">
-      <default>"&lt;Super&gt;q"</default>
-      <summary>Keybinding to show the dock and the number overlay.</summary>
-      <description>Behavior depends on hotkeys-show-dock and hotkeys-overlay.</description>
-    </key>
-    <key type="as" name="shortcut">
-      <default><![CDATA[['<Super>q']]]></default>
-      <summary>Keybinding to show the dock and the number overlay.</summary>
-      <description>Behavior depends on hotkeys-show-dock and hotkeys-overlay.</description>
-    </key>
-    <key type="d" name="shortcut-timeout">
-      <default>2</default>
-      <summary>Timeout to hide the dock</summary>
-      <description>Sets the time duration before the dock is hidden again.</description>
-    </key>
-    <key type="b" name="hotkeys-overlay">
-      <default>true</default>
-      <summary>Show the dock when using the hotkeys</summary>
-      <description>The dock will be quickly shown so that the number-overlay is visible and app activation is easier</description>
-    </key>
-    <key name="app-ctrl-hotkey-1" type="as">
-      <default><![CDATA[['<Ctrl><Super>1']]]></default>
-      <summary>Keybinding to launch 1st dash app</summary>
-      <description>
-        Keybinding to launch 1st app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-2" type="as">
-      <default><![CDATA[['<Ctrl><Super>2']]]></default>
-      <summary>Keybinding to launch 2nd dash app</summary>
-      <description>
-        Keybinding to launch 2nd app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-3" type="as">
-      <default><![CDATA[['<Ctrl><Super>3']]]></default>
-      <summary>Keybinding to launch 3rd dash app</summary>
-      <description>
-        Keybinding to launch 3rd app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-4" type="as">
-      <default><![CDATA[['<Ctrl><Super>4']]]></default>
-      <summary>Keybinding to launch 4th dash app</summary>
-      <description>
-        Keybinding to launch 4th app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-5" type="as">
-      <default><![CDATA[['<Ctrl><Super>5']]]></default>
-      <summary>Keybinding to launch 5th dash app</summary>
-      <description>
-        Keybinding to launch 5th app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-6" type="as">
-      <default><![CDATA[['<Ctrl><Super>6']]]></default>
-      <summary>Keybinding to launch 6th dash app</summary>
-      <description>
-        Keybinding to launch 6th app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-7" type="as">
-      <default><![CDATA[['<Ctrl><Super>7']]]></default>
-      <summary>Keybinding to launch 7th dash app</summary>
-      <description>
-        Keybinding to launch 7th app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-8" type="as">
-      <default><![CDATA[['<Ctrl><Super>8']]]></default>
-      <summary>Keybinding to launch 8th dash app</summary>
-      <description>
-        Keybinding to launch 8th app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-9" type="as">
-      <default><![CDATA[['<Ctrl><Super>9']]]></default>
-      <summary>Keybinding to launch 9th dash app</summary>
-      <description>
-        Keybinding to launch 9th app.
-      </description>
-    </key>
-    <key name="app-ctrl-hotkey-10" type="as">
-      <default><![CDATA[['<Ctrl><Super>0']]]></default>
-      <summary>Keybinding to launch 10th dash app</summary>
-      <description>
-        Keybinding to launch 10th app.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-1" type="as">
-      <default><![CDATA[['<Shift><Super>1']]]></default>
-      <summary>Keybinding to trigger 1st dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 1st app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-2" type="as">
-      <default><![CDATA[['<Shift><Super>2']]]></default>
-      <summary>Keybinding to trigger 2nd dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 2nd app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-3" type="as">
-      <default><![CDATA[['<Shift><Super>3']]]></default>
-      <summary>Keybinding to trigger 3rd dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 3rd app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-4" type="as">
-      <default><![CDATA[['<Shift><Super>4']]]></default>
-      <summary>Keybinding to trigger 4th dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 4th app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-5" type="as">
-      <default><![CDATA[['<Shift><Super>5']]]></default>
-      <summary>Keybinding to trigger 5th dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 5th app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-6" type="as">
-      <default><![CDATA[['<Shift><Super>6']]]></default>
-      <summary>Keybinding to trigger 6th dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 6th app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-7" type="as">
-      <default><![CDATA[['<Shift><Super>7']]]></default>
-      <summary>Keybinding to trigger 7th dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 7th app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-8" type="as">
-      <default><![CDATA[['<Shift><Super>8']]]></default>
-      <summary>Keybinding to trigger 8th dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 8th app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-9" type="as">
-      <default><![CDATA[['<Shift><Super>9']]]></default>
-      <summary>Keybinding to trigger 9th dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 9th app with shift behavior.
-      </description>
-    </key>
-    <key name="app-shift-hotkey-10" type="as">
-      <default><![CDATA[['<Shift><Super>0']]]></default>
-      <summary>Keybinding to trigger 10th dash app with shift behavior</summary>
-      <description>
-        Keybinding to trigger 10th app with shift behavior.
-      </description>
-    </key>
-    <key name="app-hotkey-1" type="as">
-      <default><![CDATA[['<Super>1']]]></default>
-      <summary>Keybinding to trigger 1st dash app</summary>
-      <description>
-        Keybinding to either show or launch the 1st application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-2" type="as">
-      <default><![CDATA[['<Super>2']]]></default>
-      <summary>Keybinding to trigger 2nd dash app</summary>
-      <description>
-        Keybinding to either show or launch the 2nd application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-3" type="as">
-      <default><![CDATA[['<Super>3']]]></default>
-      <summary>Keybinding to trigger 3rd dash app</summary>
-      <description>
-        Keybinding to either show or launch the 3rd application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-4" type="as">
-      <default><![CDATA[['<Super>4']]]></default>
-      <summary>Keybinding to trigger 4th dash app</summary>
-      <description>
-        Keybinding to either show or launch the 4th application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-5" type="as">
-      <default><![CDATA[['<Super>5']]]></default>
-      <summary>Keybinding to trigger 5th dash app</summary>
-      <description>
-        Keybinding to either show or launch the 5th application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-6" type="as">
-      <default><![CDATA[['<Super>6']]]></default>
-      <summary>Keybinding to trigger 6th dash app</summary>
-      <description>
-        Keybinding to either show or launch the 6th application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-7" type="as">
-      <default><![CDATA[['<Super>7']]]></default>
-      <summary>Keybinding to trigger 7th dash app</summary>
-      <description>
-        Keybinding to either show or launch the 7th application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-8" type="as">
-      <default><![CDATA[['<Super>8']]]></default>
-      <summary>Keybinding to trigger 8th dash app</summary>
-      <description>
-        Keybinding to either show or launch the 8th application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-9" type="as">
-      <default><![CDATA[['<Super>9']]]></default>
-      <summary>Keybinding to trigger 9th dash app</summary>
-      <description>
-        Keybinding to either show or launch the 9th application in the dash.
-      </description>
-    </key>
-    <key name="app-hotkey-10" type="as">
-      <default><![CDATA[['<Super>0']]]></default>
-      <summary>Keybinding to trigger 10th dash app</summary>
-      <description>
-        Keybinding to either show or launch the 10th application in the dash.
-      </description>
-    </key>
     <key name="force-straight-corner" type="b">
       <default>false</default>
       <summary>Force straight corners in dash</summary>
@@ -619,11 +223,6 @@
       <default>true</default>
       <summary>Enable glossy effect</summary>
       <description>Toggle the glossy effect of the unity7 backlit feature.</description>
-    </key>
-    <key name="hide-tooltip" type="b">
-      <default>false</default>
-      <summary>Hide application tooltip</summary>
-      <description>Hide tooltip when hovering application in the dash.</description>
     </key>
     <key name="show-icons-emblems" type="b">
       <default>true</default>

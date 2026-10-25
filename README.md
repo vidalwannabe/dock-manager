@@ -2,8 +2,6 @@
 
 Personal fork of [Dash to Dock](https://github.com/ubuntu/dash-to-dock) v110. Its only change: `stylesheet.css` keeps the dock's layout (margins, padding, sizes, spacing) and has no colors, backgrounds, corners or transparencies, so the dock shows GNOME's own style and any extension that recolors the shell recolors it too.
 
-![screenshot](https://github.com/micheleg/dash-to-dock/raw/master/media/screenshot.jpg)
-
 ## A dock for the GNOME Shell
 This extension enhances the dash moving it out of the overview and transforming it in a dock for an easier launching of applications and a faster switching between windows and desktops without having to leave the desktop view.
 
