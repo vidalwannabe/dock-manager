@@ -8,7 +8,6 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Extension from 'resource:///org/gnome/shell/extensions/extension.js';
-import * as AnimationUtils from 'resource:///org/gnome/shell/misc/animationUtils.js';
 import * as AppDisplay from 'resource:///org/gnome/shell/ui/appDisplay.js';
 import * as AppMenu from 'resource:///org/gnome/shell/ui/appMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -37,7 +36,6 @@ const Labels = Object.freeze({
 });
 
 const DOCK_DWELL_CHECK_INTERVAL = 100;
-const ICON_ANIMATOR_DURATION = 3000;
 const STARTUP_ANIMATION_TIME = 500;
 
 // Share of the screen edge the dock may take, out of panel mode.
@@ -748,7 +746,6 @@ const DockedDash = GObject.registerClass({
             return;
 
         this.dockState = State.SHOWING;
-        this.dash.iconAnimator.start();
         this._delayedHide = false;
 
         this._slider.ease_property('slide-x', 1, {
@@ -775,7 +772,6 @@ const DockedDash = GObject.registerClass({
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
                 this.dockState = State.HIDDEN;
-                this.dash.iconAnimator.pause();
             },
         });
     }
@@ -2073,94 +2069,6 @@ export class DockManager {
     }
 }
 Signals.addSignalMethods(DockManager.prototype);
-
-// This class drives long-running icon animations, to keep them running in sync
-// with each other, and to save CPU by pausing them when the dock is hidden.
-export class IconAnimator {
-    constructor(actor) {
-        this._count = 0;
-        this._started = false;
-        this._animations = {
-            wiggle: [],
-        };
-        this._timeline = new Clutter.Timeline({
-            duration: AnimationUtils.adjustAnimationTime(ICON_ANIMATOR_DURATION) || 1,
-            repeat_count: -1,
-            actor,
-        });
-
-        this._updateSettings();
-        this._settingsChangedId = St.Settings.get().connect('notify',
-            () => this._updateSettings());
-
-        this._newFrameID = this._timeline.connect('new-frame', () => {
-            const progress = this._timeline.get_progress();
-            const wiggleRotation = progress < 1 / 6 ? 15 * Math.sin(progress * 24 * Math.PI) : 0;
-            const wigglers = this._animations.wiggle;
-            for (let i = 0, iMax = wigglers.length; i < iMax; i++)
-                wigglers[i].target.rotation_angle_z = wiggleRotation;
-        });
-    }
-
-    _updateSettings() {
-        this._timeline.set_duration(
-            AnimationUtils.adjustAnimationTime(ICON_ANIMATOR_DURATION) || 1);
-    }
-
-    destroy() {
-        St.Settings.get().disconnect(this._settingsChangedId);
-        this._timeline.disconnect(this._newFrameID);
-        this._timeline.stop();
-        delete this._timeline;
-        for (const pairs of Object.values(this._animations)) {
-            for (let i = 0, iMax = pairs.length; i < iMax; i++) {
-                const pair = pairs[i];
-                pair.target.disconnect(pair.targetDestroyId);
-            }
-        }
-        this._animations = null;
-    }
-
-    pause() {
-        if (this._started && this._count > 0)
-            this._timeline.stop();
-
-        this._started = false;
-    }
-
-    start() {
-        if (!this._started && this._count > 0)
-            this._timeline.start();
-
-        this._started = true;
-    }
-
-    addAnimation(target, name) {
-        const targetDestroyId = target.connect('destroy',
-            () => this.removeAnimation(target, name));
-        this._animations[name].push({target, targetDestroyId});
-        if (this._started && this._count === 0)
-            this._timeline.start();
-
-        this._count++;
-    }
-
-    removeAnimation(target, name) {
-        const pairs = this._animations[name];
-        for (let i = 0, iMax = pairs.length; i < iMax; i++) {
-            const pair = pairs[i];
-            if (pair.target === target) {
-                target.disconnect(pair.targetDestroyId);
-                pairs.splice(i, 1);
-                this._count--;
-                if (this._started && this._count === 0)
-                    this._timeline.stop();
-
-                return;
-            }
-        }
-    }
-}
 
 // ---------- Intellihide ----------
 

@@ -75,13 +75,12 @@ export const DockAbstractAppIcon = GObject.registerClass({
     },
 }, class DockAbstractAppIcon extends Dash.DashIcon {
     // settings are required inside.
-    _init(app, monitorIndex, iconAnimator) {
+    _init(app, monitorIndex) {
         super._init(app);
 
         // a prefix is required to avoid conflicting with the parent class variable
         this.monitorIndex = monitorIndex;
         this._signalsHandler = new Utils.GlobalSignalsHandler(this);
-        this.iconAnimator = iconAnimator;
         this._indicator = new RunningIndicatorDots(this);
         this._urgentWindows = new Set();
 
@@ -137,19 +136,14 @@ export const DockAbstractAppIcon = GObject.registerClass({
         this.notify('updating');
 
         this.connect('notify::urgent', () => {
-            const icon = this.icon._iconBin;
             this._signalsHandler.removeWithLabel(Labels.URGENT_WINDOWS);
             if (this.urgent) {
-                icon.set_pivot_point(0.5, 0.5);
-                this.iconAnimator.addAnimation(icon, 'wiggle');
                 if (this.running && !this._urgentWindows.size) {
                     const urgentWindows = this.getInterestingWindows();
                     urgentWindows.forEach(w => (w._manualUrgency = true));
                     this._updateUrgentWindows(urgentWindows);
                 }
             } else {
-                this.iconAnimator.removeAnimation(icon, 'wiggle');
-                icon.rotation_angle_z = 0;
                 this._urgentWindows.forEach(w => delete w._manualUrgency);
                 this._updateUrgentWindows();
             }
@@ -483,8 +477,8 @@ export const DockAbstractAppIcon = GObject.registerClass({
 
 const DockAppIcon = GObject.registerClass({
 }, class DockAppIcon extends DockAbstractAppIcon {
-    _init(app, monitorIndex, iconAnimator) {
-        super._init(app, monitorIndex, iconAnimator);
+    _init(app, monitorIndex) {
+        super._init(app, monitorIndex);
 
         const {windowTracker} = Docking.DockManager;
         this._signalsHandler.add(windowTracker, 'notify::focus-app',
@@ -494,11 +488,11 @@ const DockAppIcon = GObject.registerClass({
 
 const DockLocationAppIcon = GObject.registerClass({
 }, class DockLocationAppIcon extends DockAbstractAppIcon {
-    _init(app, monitorIndex, iconAnimator) {
+    _init(app, monitorIndex) {
         if (!(app.appInfo instanceof Locations.LocationAppInfo))
             throw new Error('Provided application %s is not a Location'.format(app));
 
-        super._init(app, monitorIndex, iconAnimator);
+        super._init(app, monitorIndex);
 
         this._signalsHandler.add(global.display, 'notify::focus-window',
             () => this._updateFocusState());
@@ -518,13 +512,12 @@ const DockLocationAppIcon = GObject.registerClass({
 /**
  * @param app
  * @param monitorIndex
- * @param iconAnimator
  */
-export function makeAppIcon(app, monitorIndex, iconAnimator) {
+export function makeAppIcon(app, monitorIndex) {
     if (app.appInfo instanceof Locations.LocationAppInfo)
-        return new DockLocationAppIcon(app, monitorIndex, iconAnimator);
+        return new DockLocationAppIcon(app, monitorIndex);
 
-    return new DockAppIcon(app, monitorIndex, iconAnimator);
+    return new DockAppIcon(app, monitorIndex);
 }
 
 /**

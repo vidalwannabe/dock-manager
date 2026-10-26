@@ -127,7 +127,6 @@ export const DockDash = GObject.registerClass({
     Signals: {
         'menu-opened': {},
         'menu-closed': {},
-        'icon-size-changed': {},
     },
 }, class DockDash extends St.Widget {
     _init(monitorIndex) {
@@ -141,7 +140,6 @@ export const DockDash = GObject.registerClass({
         this._maxWidth = -1;
         this._maxHeight = -1;
         this.iconSize = ICON_SIZE;
-        this._availableIconSizes = [ICON_SIZE];
         this._shownInitially = false;
         this._signalsHandler = new Utils.GlobalSignalsHandler(this);
 
@@ -257,8 +255,6 @@ export const DockDash = GObject.registerClass({
 
         this._appSystem = Shell.AppSystem.get_default();
 
-        this.iconAnimator = new Docking.IconAnimator(this);
-
         this._signalsHandler.add([
             this._appSystem,
             'installed-changed',
@@ -324,8 +320,6 @@ export const DockDash = GObject.registerClass({
     }
 
     _onDestroy() {
-        this.iconAnimator.destroy();
-
         if (this._requiresVisibilityTimeout) {
             GLib.source_remove(this._requiresVisibilityTimeout);
             delete this._requiresVisibilityTimeout;
@@ -516,7 +510,7 @@ export const DockDash = GObject.registerClass({
     }
 
     _createAppItem(app) {
-        const appIcon = new AppIcons.makeAppIcon(app, this._monitorIndex, this.iconAnimator);
+        const appIcon = new AppIcons.makeAppIcon(app, this._monitorIndex);
 
         if (appIcon._draggable) {
             appIcon._draggable.connect('drag-begin', () => {
@@ -616,135 +610,6 @@ export const DockDash = GObject.registerClass({
             // add a custom signal to the appIcon, since gnome 3.8 the signal
             // calling this callback was added upstream.
             this.emit('menu-closed');
-        }
-    }
-
-    _adjustIconSize() {
-        // For the icon size, we only consider children which are "proper"
-        // icons (i.e. ignoring drag placeholders) and which are not
-        // animating out (which means they will be destroyed at the end of
-        // the animation)
-        const iconChildren = this._box.get_children().filter(actor => {
-            return actor.child &&
-                   actor.child._delegate &&
-                   actor.child._delegate.icon &&
-                   !actor.animatingOut;
-        });
-
-        iconChildren.push(this._showAppsIcon);
-
-        if (this._maxWidth === -1 && this._maxHeight === -1)
-            return;
-
-        // Check if the container is present in the stage. This avoids critical
-        // errors when unlocking the screen
-        if (!this._container.get_stage())
-            return;
-
-        const themeNode = this._dashContainer.get_theme_node();
-        const maxAllocation = new Clutter.ActorBox({
-            x1: 0,
-            y1: 0,
-            x2: this._isHorizontal ? this._maxWidth : 42 /* whatever */,
-            y2: this._isHorizontal ? 42 : this._maxHeight,
-        });
-        const maxContent = themeNode.get_content_box(maxAllocation);
-        let availSpace;
-        if (this._isHorizontal)
-            availSpace = maxContent.get_width();
-        else
-            availSpace = maxContent.get_height();
-
-        const spacing = themeNode.get_length('spacing');
-
-        const [{child: firstButton}] = iconChildren;
-        const {child: firstIcon} = firstButton?.icon ?? {child: null};
-
-        // if no icons there's nothing to adjust
-        if (!firstIcon)
-            return;
-
-        // Enforce valid spacings during the size request
-        firstIcon.ensure_style();
-        const [, , iconWidth, iconHeight] = firstIcon.get_preferred_size();
-        const [, , buttonWidth, buttonHeight] = firstButton.get_preferred_size();
-
-        if (this._isHorizontal) {
-            // Subtract icon padding and box spacing from the available width
-            availSpace -= iconChildren.length * (buttonWidth - iconWidth) +
-                           (iconChildren.length - 1) * spacing;
-
-            if (this._separator) {
-                const [, , separatorWidth] = this._separator.get_preferred_size();
-                availSpace -= separatorWidth + spacing;
-            }
-        } else {
-            // Subtract icon padding and box spacing from the available height
-            availSpace -= iconChildren.length * (buttonHeight - iconHeight) +
-                           (iconChildren.length - 1) * spacing;
-
-            if (this._separator) {
-                const [, , , separatorHeight] = this._separator.get_preferred_size();
-                availSpace -= separatorHeight + spacing;
-            }
-        }
-
-        const maxIconSize = availSpace / iconChildren.length;
-        const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
-        const iconSizes = this._availableIconSizes.map(s => s * scaleFactor);
-
-        let [newIconSize] = this._availableIconSizes;
-        for (let i = 0; i < iconSizes.length; i++) {
-            if (iconSizes[i] <= maxIconSize)
-                newIconSize = this._availableIconSizes[i];
-        }
-
-        if (newIconSize === this.iconSize)
-            return;
-
-        const oldIconSize = this.iconSize;
-        this.iconSize = newIconSize;
-        this.emit('icon-size-changed');
-
-        const scale = oldIconSize / newIconSize;
-        for (let i = 0; i < iconChildren.length; i++) {
-            const {icon} = iconChildren[i].child._delegate;
-
-            // Set the new size immediately, to keep the icons' sizes
-            // in sync with this.iconSize
-            icon.setIconSize(this.iconSize);
-
-            // Don't animate the icon size change when the overview
-            // is transitioning, not visible or when initially filling
-            // the dash
-            if (!Main.overview.visible || Main.overview.animationInProgress ||
-                !this._shownInitially)
-                continue;
-
-            const [targetWidth, targetHeight] = icon.icon.get_size();
-
-            // Scale the icon's texture to the previous size and
-            // tween to the new size
-            icon.icon.set_size(icon.icon.width * scale,
-                icon.icon.height * scale);
-
-            icon.icon.ease({
-                width: targetWidth,
-                height: targetHeight,
-                duration: DASH_ANIMATION_TIME,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            });
-        }
-
-        if (this._separator) {
-            const animateProperties = this._isHorizontal
-                ? {height: this.iconSize} : {width: this.iconSize};
-
-            this._separator.ease({
-                ...animateProperties,
-                duration: DASH_ANIMATION_TIME,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            });
         }
     }
 
@@ -948,8 +813,6 @@ export const DockDash = GObject.registerClass({
             this._separator.destroy();
             this._separator = null;
         }
-
-        this._adjustIconSize();
 
         // Skip animations on first run when adding the initial set
         // of items, to avoid all items zooming in at once

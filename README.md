@@ -13,7 +13,7 @@ GNOME Shell extension (GNOME 48) that moves the dash out of the overview into a 
 | Position on screen | Left, bottom, top or right |
 | Intelligent autohide | On unless the dock is fixed. The dock hides when a window of the focused application touches it. With Autohide on, it shows when the pointer rests on the screen edge, also in fullscreen and for urgent windows if enabled, with its own animation, show and hide timeouts |
 
-Pinned and running applications of every workspace are always shown, and mounted volumes appear in the dock too. The dock takes up to 90% of the screen edge, icons are 64 px (GNOME's own size) and the ones that don't fit are reached by scrolling over the dock. Urgent applications wiggle.
+Pinned and running applications of every workspace are always shown, and mounted volumes appear in the dock too. The dock takes up to 90% of the screen edge, icons are 64 px (GNOME's own size) and the ones that don't fit are reached by scrolling over the dock.
 
 **Appearance**
 
