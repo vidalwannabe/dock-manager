@@ -291,7 +291,7 @@ export const DockAbstractAppIcon = GObject.registerClass({
 
     _updateRunningStyle() {
         // The logic originally in this function has been moved to
-        // AppIconIndicatorBase._updateDefaultDot(). However it cannot be removed as
+        // RunningIndicatorDots.update(). However it cannot be removed as
         // it called by the parent constructor.
     }
 
@@ -1050,85 +1050,6 @@ export function itemShowLabel() {
 
 const MAX_WINDOWS_CLASSES = 4;
 
-/*
- * Base class to be inherited by all indicators of any kind
-*/
-class IndicatorBase {
-    constructor(source) {
-        this._source = source;
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this._source);
-    }
-
-    update() {
-    }
-
-    destroy() {
-        this._source = null;
-        this._signalsHandler.destroy();
-        this._signalsHandler = null;
-    }
-}
-
-/*
- * A base indicator class for running style, from which all other RunningIndicators should derive,
- * providing some basic methods, variables definitions and their update,  css style classes handling.
- *
- */
-class RunningIndicatorBase extends IndicatorBase {
-    constructor(source) {
-        super(source);
-
-        this._side = Utils.getPosition();
-        this._dominantColorExtractor = new DominantColorExtractor(this._source.app);
-        this._signalsHandler.add(this._source, 'notify::running', () => this.update());
-        this._signalsHandler.add(this._source, 'notify::focused', () => this.update());
-        this._signalsHandler.add(this._source, 'notify::windows-count', () => this._updateCounterClass());
-        this.update();
-    }
-
-    get _number() {
-        return Math.min(this._source.windowsCount, MAX_WINDOWS_CLASSES);
-    }
-
-    update() {
-        this._updateCounterClass();
-        this._updateDefaultDot();
-    }
-
-    _updateCounterClass() {
-        for (let i = 1; i <= MAX_WINDOWS_CLASSES; i++) {
-            const className = `running${i}`;
-            if (i !== this._number)
-                this._source.remove_style_class_name(className);
-            else
-                this._source.add_style_class_name(className);
-        }
-    }
-
-    _updateDefaultDot() {
-        if (this._source.running)
-            this._source._dot.show();
-        else
-            this._source._dot.hide();
-    }
-
-    _hideDefaultDot() {
-        // I use opacity to hide the default dot because the show/hide function
-        // are used by the parent class.
-        this._source._dot.opacity = 0;
-    }
-
-    _restoreDefaultDot() {
-        this._source._dot.opacity = 255;
-    }
-
-    destroy() {
-        this._restoreDefaultDot();
-
-        super.destroy();
-    }
-}
-
 const IndicatorDrawingArea = GObject.registerClass(
 class IndicatorDrawingArea extends St.DrawingArea {
     vfunc_allocate(box) {
@@ -1145,11 +1066,18 @@ class IndicatorDrawingArea extends St.DrawingArea {
     }
 });
 
-class RunningIndicatorDots extends RunningIndicatorBase {
+// The running dots: one per window, up to MAX_WINDOWS_CLASSES, drawn in place of GNOME's dot
+// (kept hidden, so the icon keeps its layout) with the dot's style or the icon's dominant color.
+class RunningIndicatorDots {
     constructor(source) {
-        super(source);
+        this._source = source;
+        this._signalsHandler = new Utils.GlobalSignalsHandler(source);
+        this._side = Utils.getPosition();
+        this._dominantColorExtractor = new DominantColorExtractor(source.app);
 
-        this._hideDefaultDot();
+        // I use opacity to hide the default dot because the show/hide function
+        // are used by the parent class.
+        source._dot.opacity = 0;
 
         this._area = new IndicatorDrawingArea({
             x_expand: true,
@@ -1165,10 +1093,6 @@ class RunningIndicatorDots extends RunningIndicatorBase {
             this._area.rotation_angle_z = 180;
             break;
 
-        case St.Side.BOTTOM:
-            // nothing
-            break;
-
         case St.Side.LEFT:
             this._area.rotation_angle_z = 90;
             break;
@@ -1179,17 +1103,51 @@ class RunningIndicatorDots extends RunningIndicatorBase {
         }
 
         this._area.connectObject('repaint', this._updateIndicator.bind(this), this);
-        this._source._iconContainer.add_child(this._area);
+        source._iconContainer.add_child(this._area);
 
-        this._signalsHandler.add(Docking.DockManager.settings,
-            'changed::running-indicator-dominant-color', this.update.bind(this));
+        this._signalsHandler.add([
+            source,
+            'notify::running',
+            () => this.update(),
+        ], [
+            source,
+            'notify::focused',
+            () => this.update(),
+        ], [
+            source,
+            'notify::windows-count',
+            () => this._updateCounterClass(),
+        ], [
+            Docking.DockManager.settings,
+            'changed::running-indicator-dominant-color',
+            () => this.update(),
+        ]);
+        this.update();
+    }
+
+    get _number() {
+        return Math.min(this._source.windowsCount, MAX_WINDOWS_CLASSES);
     }
 
     update() {
-        super.update();
+        this._updateCounterClass();
 
-        if (this._area)
-            this._area.queue_repaint();
+        if (this._source.running)
+            this._source._dot.show();
+        else
+            this._source._dot.hide();
+
+        this._area.queue_repaint();
+    }
+
+    _updateCounterClass() {
+        for (let i = 1; i <= MAX_WINDOWS_CLASSES; i++) {
+            const className = `running${i}`;
+            if (i !== this._number)
+                this._source.remove_style_class_name(className);
+            else
+                this._source.add_style_class_name(className);
+        }
     }
 
     _computeStyle() {
@@ -1255,7 +1213,10 @@ class RunningIndicatorDots extends RunningIndicatorBase {
     destroy() {
         this._area.destroy();
         delete this._area;
-        super.destroy();
+        this._source._dot.opacity = 255;
+        this._source = null;
+        this._signalsHandler.destroy();
+        this._signalsHandler = null;
     }
 }
 
