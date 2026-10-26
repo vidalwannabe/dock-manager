@@ -82,11 +82,6 @@
       <summary>Enable multi-monitor docks</summary>
       <description>Show a dock on every monitor</description>
     </key>
-    <key name="force-straight-corner" type="b">
-      <default>false</default>
-      <summary>Force straight corners in dash</summary>
-      <description>Make the borders in the dash non rounded</description>
-    </key>
     <key name="overview-zoom" type="b">
       <default>false</default>
       <summary>Seamless overview zoom</summary>

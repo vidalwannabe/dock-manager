@@ -109,7 +109,8 @@ export class ThemeManager {
     _updateCustomStyleClasses() {
         const {settings} = DockManager;
 
-        if (settings.forceStraightCorner)
+        // An extended dock reaches the screen corners, so its own corners are straight.
+        if (settings.dockExtended)
             this._actor.add_style_class_name('straight-corner');
         else
             this._actor.remove_style_class_name('straight-corner');
@@ -161,7 +162,6 @@ export class ThemeManager {
     _bindSettingsChanges() {
         const keys = [
             'extend-height',
-            'force-straight-corner',
             'transparent-background',
         ];
 
