@@ -24,6 +24,7 @@ Pinned and running applications of every workspace are always shown. Unless exte
 | Straight corners | No rounded corners |
 | Transparent background | The dock without its background |
 | Colored indicator dots | One dot per window (up to four), in the icon's dominant color instead of the dot's |
+| Seamless overview zoom | The whole desktop zooms in and out of the overview, including the strips behind the top bar and a fixed dock, which GNOME leaves out. Based on [Overview Seamless Zoom](https://gitlab.com/jguece/overview-seamless-zoom) by jguece, as Kiwi is not Apple also does |
 
 **Icons**
 
@@ -39,6 +40,7 @@ The focused application's tile stands out from the others, in the shade the them
 | `dock/intellihide.js` | Hides the dock when the focused application's windows touch it |
 | `dock/monitorIsolation.js` | Isolate monitors |
 | `dock/overview.js` | Fits GNOME's overview to the dock, in place of GNOME's own dash |
+| `dock/overviewZoom.js` | Seamless overview zoom |
 | `dock/theme.js` | The dock's style classes |
 | `dock/dash.js` | The row of icons inside a dock: which apps, their order, dragging and scrolling |
 | `icons/appIcon.js` | An application's icon: clicks, states, the focused highlight and its label |

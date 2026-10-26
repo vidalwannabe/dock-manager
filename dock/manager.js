@@ -11,6 +11,7 @@ import {GlobalSignalsHandler} from '../handlers.js';
 import {DockedDash, STARTUP_ANIMATION_TIME} from './dockedDash.js';
 import {MonitorIsolation} from './monitorIsolation.js';
 import {OverviewIntegration} from './overview.js';
+import {OverviewZoom} from './overviewZoom.js';
 
 const {signals: Signals} = imports;
 
@@ -32,6 +33,7 @@ export class DockManager {
         this._iconTheme = new St.IconTheme();
 
         this._overview = new OverviewIntegration(this);
+        this._overviewZoom = new OverviewZoom();
         this._windowTracker = Shell.WindowTracker.get_default();
 
         // Connect relevant signals to the toggling function
@@ -83,6 +85,10 @@ export class DockManager {
 
     get windowTracker() {
         return this._windowTracker;
+    }
+
+    get overviewZoom() {
+        return this._overviewZoom;
     }
 
     get mainDock() {
@@ -313,6 +319,8 @@ export class DockManager {
             global.compositor.get_laters().remove(this._toggleLater);
             delete this._toggleLater;
         }
+        this._overviewZoom.destroy();
+        this._overviewZoom = null;
         this._overview.destroy();
         this._overview = null;
         this._deleteDocks();

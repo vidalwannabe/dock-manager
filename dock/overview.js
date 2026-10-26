@@ -13,6 +13,7 @@ import * as WorkspacesView from 'resource:///org/gnome/shell/ui/workspacesView.j
 
 import {GlobalSignalsHandler, InjectionsHandler, PropertyInjectionsHandler, VFuncInjectionsHandler} from '../handlers.js';
 import {DockManager} from './manager.js';
+import {coverMonitor} from './overviewZoom.js';
 
 const Labels = Object.freeze({
     MAIN_DASH: Symbol('main-dash'),
@@ -277,8 +278,10 @@ export class OverviewIntegration {
             '_computeWorkspacesBoxForState',
             function (originalFunction, state, ...args) {
                 /* eslint-disable no-invalid-this */
-                if (state === OverviewControls.ControlsState.HIDDEN)
-                    return originalFunction.call(this, state, ...args);
+                if (state === OverviewControls.ControlsState.HIDDEN) {
+                    const box = originalFunction.call(this, state, ...args);
+                    return DockManager.getDefault().overviewZoom.active ? coverMonitor(box) : box;
+                }
 
                 const box = workspaceBoxOriginFixer.call(this, originalFunction, state, ...args);
                 const dock = DockManager.getDefault().getDockByMonitor(Main.layoutManager.primaryIndex);

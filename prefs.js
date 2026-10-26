@@ -89,6 +89,7 @@ export default class DockPreferences extends ExtensionPreferences {
         group.add(switchRow(settings, 'force-straight-corner', 'Straight corners'));
         group.add(switchRow(settings, 'transparent-background', 'Transparent background'));
         group.add(switchRow(settings, 'running-indicator-dominant-color', 'Colored indicator dots'));
+        group.add(switchRow(settings, 'overview-zoom', 'Seamless overview zoom'));
         return group;
     }
 }
