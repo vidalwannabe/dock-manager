@@ -193,17 +193,19 @@ export const DockedDash = GObject.registerClass({
     _init(params) {
         this._position = DockManager.settings.dockPosition;
 
-        // This is the centering actor
+        // This is the centering actor. Its style classes name its side and its axis
+        // (horizontal or vertical): the stylesheet sets what both sides of an axis share once.
+        const isHorizontal = (this._position === St.Side.TOP) || (this._position === St.Side.BOTTOM);
         super._init({
             ...params,
             name: 'dockManagerContainer',
             reactive: false,
-            style_class: PositionStyleClass[this._position],
+            style_class: `${PositionStyleClass[this._position]} ${isHorizontal ? 'horizontal' : 'vertical'}`,
         });
 
         // Load settings
         const {settings} = DockManager;
-        this._isHorizontal = (this._position === St.Side.TOP) || (this._position === St.Side.BOTTOM);
+        this._isHorizontal = isHorizontal;
 
         // Temporary ignore hover events linked to autohide for whatever reason
         this._ignoreHover = false;

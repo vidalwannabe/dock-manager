@@ -2,6 +2,11 @@
  * Dock Manager's stylesheet: only the dock's layout (margins, padding, sizes, spacing), taken
  * from Dash to Dock v110. It has no colors, backgrounds, corners or transparencies, so the
  * dock shows GNOME's own style, and any extension that recolors the shell recolors it too.
+ *
+ * The dock's container has a class for its side (bottom, top, left, right) and one for its
+ * axis (horizontal for bottom and top, vertical for left and right), with the same weight.
+ * What all sides share is set once for both axes, what the two sides of an axis share once
+ * for that axis, and only what differs for each side.
  */
 
 .dash-item-container .overview-tile .app-grid-running-dot {
@@ -9,87 +14,192 @@
   offset-y: 2px;
 }
 
-#dockManagerContainer.bottom #dash {
+#dockManagerContainer.horizontal #dash,
+#dockManagerContainer.vertical #dash {
   margin: 0px;
   padding: 0px;
 }
 
-#dockManagerContainer.bottom #dash .dash-background {
+#dockManagerContainer.horizontal #dash .dash-background,
+#dockManagerContainer.vertical #dash .dash-background {
   margin: 0;
-  margin-bottom: 4px;
   padding: 0;
   spacing: 6px;
 }
 
-#dockManagerContainer.bottom #dash .dash-separator {
-  margin: 0 4px;
-  width: 1px;
-  height: 0;
+#dockManagerContainer.bottom #dash .dash-background {
   margin-bottom: 4px;
 }
 
-#dockManagerContainer.bottom #dash #dockManagerDashContainer {
-  padding: 10px;
-  padding-bottom: 0;
-  padding-top: 0;
+#dockManagerContainer.top #dash .dash-background {
+  margin-top: 4px;
 }
 
-#dockManagerContainer.bottom #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 0 2px;
+#dockManagerContainer.left #dash .dash-background {
+  margin-left: 4px;
 }
 
-#dockManagerContainer.bottom #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-left: 0;
+#dockManagerContainer.right #dash .dash-background {
+  margin-right: 4px;
 }
 
-#dockManagerContainer.bottom #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
+#dockManagerContainer.horizontal #dash .dash-separator,
+#dockManagerContainer.vertical #dash .dash-separator {
+  margin: 4px;
+  width: 1px;
+  height: 0;
+}
+
+#dockManagerContainer.vertical #dash .dash-separator {
+  width: 0;
+  height: 1px;
+}
+
+#dockManagerContainer.bottom #dash .dash-separator {
+  margin-top: 0;
+}
+
+#dockManagerContainer.top #dash .dash-separator {
+  margin-bottom: 0;
+}
+
+#dockManagerContainer.left #dash .dash-separator {
   margin-right: 0;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container {
+#dockManagerContainer.right #dash .dash-separator {
+  margin-left: 0;
+}
+
+#dockManagerContainer.horizontal #dash #dockManagerDashContainer,
+#dockManagerContainer.vertical #dash #dockManagerDashContainer {
+  padding: 0 10px;
+}
+
+#dockManagerContainer.vertical #dash #dockManagerDashContainer {
+  padding: 10px 0;
+}
+
+#dockManagerContainer.horizontal #dash #dockManagerDashContainer > #dockManagerDashScrollview,
+#dockManagerContainer.vertical #dash #dockManagerDashContainer > #dockManagerDashScrollview {
   margin: 0 2px;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container > * {
+#dockManagerContainer.vertical #dash #dockManagerDashContainer > #dockManagerDashScrollview {
+  margin: 2px 0;
+}
+
+#dockManagerContainer.horizontal #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
+  margin-left: 0;
+}
+
+#dockManagerContainer.vertical #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
+  margin-top: 0;
+}
+
+#dockManagerContainer.horizontal #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
+  margin-right: 0;
+}
+
+#dockManagerContainer.vertical #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
+  margin-bottom: 0;
+}
+
+#dockManagerContainer.horizontal #dash .dash-item-container,
+#dockManagerContainer.vertical #dash .dash-item-container {
+  margin: 0 2px;
+}
+
+#dockManagerContainer.vertical #dash .dash-item-container {
+  margin: 2px 0;
+}
+
+#dockManagerContainer.horizontal #dash .dash-item-container > *,
+#dockManagerContainer.vertical #dash .dash-item-container > * {
   margin: 0;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container:first-child {
+#dockManagerContainer.horizontal #dash .dash-item-container:first-child {
   margin-left: 0;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container:last-child {
+#dockManagerContainer.vertical #dash .dash-item-container:first-child {
+  margin-top: 0;
+}
+
+#dockManagerContainer.horizontal #dash .dash-item-container:last-child {
   margin-right: 0;
+}
+
+#dockManagerContainer.vertical #dash .dash-item-container:last-child {
+  margin-bottom: 0;
 }
 
 #dockManagerContainer.bottom #dash .dash-item-container .app-well-app,
 #dockManagerContainer.bottom #dash .dash-item-container .show-apps,
 #dockManagerContainer.bottom #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-bottom: 14px;
   padding-top: 10px;
+  padding-bottom: 14px;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.bottom #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.bottom #dash .dash-item-container .overview-tile:first-child {
+#dockManagerContainer.top #dash .dash-item-container .app-well-app,
+#dockManagerContainer.top #dash .dash-item-container .show-apps,
+#dockManagerContainer.top #dash .dash-item-container .overview-tile {
+  padding-top: 14px;
+  padding-bottom: 10px;
+}
+
+#dockManagerContainer.left #dash .dash-item-container .app-well-app,
+#dockManagerContainer.left #dash .dash-item-container .show-apps,
+#dockManagerContainer.left #dash .dash-item-container .overview-tile {
+  padding-right: 10px;
+  padding-left: 14px;
+}
+
+#dockManagerContainer.right #dash .dash-item-container .app-well-app,
+#dockManagerContainer.right #dash .dash-item-container .show-apps,
+#dockManagerContainer.right #dash .dash-item-container .overview-tile {
+  padding-right: 14px;
+  padding-left: 10px;
+}
+
+#dockManagerContainer.horizontal #dash .dash-item-container .app-well-app:first-child,
+#dockManagerContainer.horizontal #dash .dash-item-container .show-apps:first-child,
+#dockManagerContainer.horizontal #dash .dash-item-container .overview-tile:first-child {
   padding-left: 0;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.bottom #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.bottom #dash .dash-item-container .overview-tile:last-child {
+#dockManagerContainer.vertical #dash .dash-item-container .app-well-app:first-child,
+#dockManagerContainer.vertical #dash .dash-item-container .show-apps:first-child,
+#dockManagerContainer.vertical #dash .dash-item-container .overview-tile:first-child {
+  padding-top: 0;
+}
+
+#dockManagerContainer.horizontal #dash .dash-item-container .app-well-app:last-child,
+#dockManagerContainer.horizontal #dash .dash-item-container .show-apps:last-child,
+#dockManagerContainer.horizontal #dash .dash-item-container .overview-tile:last-child {
   padding-right: 0;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.bottom #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.bottom #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.bottom #dash .dash-item-container .overview-tile .app-grid-running-dot {
+#dockManagerContainer.vertical #dash .dash-item-container .app-well-app:last-child,
+#dockManagerContainer.vertical #dash .dash-item-container .show-apps:last-child,
+#dockManagerContainer.vertical #dash .dash-item-container .overview-tile:last-child {
+  padding-bottom: 0;
+}
+
+#dockManagerContainer.horizontal #dash .dash-item-container .app-well-app .app-well-app-running-dot,
+#dockManagerContainer.horizontal #dash .dash-item-container .app-well-app .app-grid-running-dot,
+#dockManagerContainer.horizontal #dash .dash-item-container .overview-tile .app-well-app-running-dot,
+#dockManagerContainer.horizontal #dash .dash-item-container .overview-tile .app-grid-running-dot,
+#dockManagerContainer.vertical #dash .dash-item-container .app-well-app .app-well-app-running-dot,
+#dockManagerContainer.vertical #dash .dash-item-container .app-well-app .app-grid-running-dot,
+#dockManagerContainer.vertical #dash .dash-item-container .overview-tile .app-well-app-running-dot,
+#dockManagerContainer.vertical #dash .dash-item-container .overview-tile .app-grid-running-dot {
   margin-bottom: 2px;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container > StButton {
+#dockManagerContainer.horizontal #dash .dash-item-container > StButton,
+#dockManagerContainer.vertical #dash .dash-item-container > StButton {
   transition-duration: 250;
 }
 
@@ -97,218 +207,21 @@
   margin-top: 4px;
 }
 
+#dockManagerContainer.top.fixed #dash .dash-background {
+  margin-bottom: 4px;
+}
+
+#dockManagerContainer.left.fixed #dash .dash-background {
+  margin-right: 4px;
+}
+
+#dockManagerContainer.right.fixed #dash .dash-background {
+  margin-left: 4px;
+}
+
 #dockManagerContainer.bottom.fixed #dash .dash-item-container .app-well-app,
 #dockManagerContainer.bottom.fixed #dash .dash-item-container .show-apps {
   padding-top: 14px;
-}
-
-.dash-label.bottom {
-  margin-bottom: 10px;
-  -x-offset: 0;
-  -y-offset: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash {
-  margin: 0px;
-  padding: 0px;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-background {
-  margin: 0;
-  margin-bottom: 0;
-  padding: 0;
-  spacing: 6px;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-separator {
-  margin: 0 4px;
-  width: 1px;
-  height: 0;
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer {
-  padding: 0;
-  padding-bottom: 0;
-  padding-top: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 0 2px;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-left: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
-  margin-right: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer > :first-child .show-apps {
-  padding-left: 8px;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:first-child {
-  padding-left: 8px;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer > :last-child .show-apps {
-  padding-right: 8px;
-}
-
-#dockManagerContainer.bottom.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:last-child {
-  padding-right: 8px;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container {
-  margin: 0 2px;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container > * {
-  margin: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container:first-child {
-  margin-left: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container:last-child {
-  margin-right: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container .app-well-app,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .show-apps,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-bottom: 10px;
-  padding-top: 10px;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .overview-tile:first-child {
-  padding-left: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .overview-tile:last-child {
-  padding-right: 0;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.bottom.extended #dash .dash-item-container .overview-tile .app-grid-running-dot {
-  margin-bottom: 2px;
-}
-
-#dockManagerContainer.bottom.extended #dash .dash-item-container > StButton {
-  transition-duration: 250;
-}
-
-#dockManagerContainer.bottom.extended.fixed #dash .dash-background {
-  margin-top: 0;
-}
-
-#dockManagerContainer.bottom.extended.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.bottom.extended.fixed #dash .dash-item-container .show-apps {
-  padding-top: 10px;
-}
-
-.dash-label.bottom {
-  margin-bottom: 10px;
-  -x-offset: 0;
-  -y-offset: 0;
-}
-
-#dockManagerContainer.top #dash {
-  margin: 0px;
-  padding: 0px;
-}
-
-#dockManagerContainer.top #dash .dash-background {
-  margin: 0;
-  margin-top: 4px;
-  padding: 0;
-  spacing: 6px;
-}
-
-#dockManagerContainer.top #dash .dash-separator {
-  margin: 0 4px;
-  width: 1px;
-  height: 0;
-  margin-top: 4px;
-}
-
-#dockManagerContainer.top #dash #dockManagerDashContainer {
-  padding: 10px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-#dockManagerContainer.top #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 0 2px;
-}
-
-#dockManagerContainer.top #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-left: 0;
-}
-
-#dockManagerContainer.top #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
-  margin-right: 0;
-}
-
-#dockManagerContainer.top #dash .dash-item-container {
-  margin: 0 2px;
-}
-
-#dockManagerContainer.top #dash .dash-item-container > * {
-  margin: 0;
-}
-
-#dockManagerContainer.top #dash .dash-item-container:first-child {
-  margin-left: 0;
-}
-
-#dockManagerContainer.top #dash .dash-item-container:last-child {
-  margin-right: 0;
-}
-
-#dockManagerContainer.top #dash .dash-item-container .app-well-app,
-#dockManagerContainer.top #dash .dash-item-container .show-apps,
-#dockManagerContainer.top #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-top: 14px;
-  padding-bottom: 10px;
-}
-
-#dockManagerContainer.top #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.top #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.top #dash .dash-item-container .overview-tile:first-child {
-  padding-left: 0;
-}
-
-#dockManagerContainer.top #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.top #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.top #dash .dash-item-container .overview-tile:last-child {
-  padding-right: 0;
-}
-
-#dockManagerContainer.top #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.top #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.top #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.top #dash .dash-item-container .overview-tile .app-grid-running-dot {
-  margin-bottom: 2px;
-}
-
-#dockManagerContainer.top #dash .dash-item-container > StButton {
-  transition-duration: 250;
-}
-
-#dockManagerContainer.top.fixed #dash .dash-background {
-  margin-bottom: 4px;
 }
 
 #dockManagerContainer.top.fixed #dash .dash-item-container .app-well-app,
@@ -316,427 +229,9 @@
   padding-bottom: 14px;
 }
 
-.dash-label.top {
-  margin-top: 10px;
-  -x-offset: 0;
-  -y-offset: 0;
-}
-
-#dockManagerContainer.top.extended #dash {
-  margin: 0px;
-  padding: 0px;
-}
-
-#dockManagerContainer.top.extended #dash .dash-background {
-  margin: 0;
-  margin-top: 0;
-  padding: 0;
-  spacing: 6px;
-}
-
-#dockManagerContainer.top.extended #dash .dash-separator {
-  margin: 0 4px;
-  width: 1px;
-  height: 0;
-  margin-top: 0;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer {
-  padding: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 0 2px;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-left: 0;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
-  margin-right: 0;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer > :first-child .show-apps {
-  padding-left: 8px;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:first-child {
-  padding-left: 8px;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer > :last-child .show-apps {
-  padding-right: 8px;
-}
-
-#dockManagerContainer.top.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:last-child {
-  padding-right: 8px;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container {
-  margin: 0 2px;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container > * {
-  margin: 0;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container:first-child {
-  margin-left: 0;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container:last-child {
-  margin-right: 0;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container .app-well-app,
-#dockManagerContainer.top.extended #dash .dash-item-container .show-apps,
-#dockManagerContainer.top.extended #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.top.extended #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.top.extended #dash .dash-item-container .overview-tile:first-child {
-  padding-left: 0;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.top.extended #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.top.extended #dash .dash-item-container .overview-tile:last-child {
-  padding-right: 0;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.top.extended #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.top.extended #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.top.extended #dash .dash-item-container .overview-tile .app-grid-running-dot {
-  margin-bottom: 2px;
-}
-
-#dockManagerContainer.top.extended #dash .dash-item-container > StButton {
-  transition-duration: 250;
-}
-
-#dockManagerContainer.top.extended.fixed #dash .dash-background {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.top.extended.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.top.extended.fixed #dash .dash-item-container .show-apps {
-  padding-bottom: 10px;
-}
-
-.dash-label.top {
-  margin-top: 10px;
-  -x-offset: 0;
-  -y-offset: 0;
-}
-
-#dockManagerContainer.left #dash {
-  margin: 0px;
-  padding: 0px;
-}
-
-#dockManagerContainer.left #dash .dash-background {
-  margin: 0;
-  margin-left: 4px;
-  padding: 0;
-  spacing: 6px;
-}
-
-#dockManagerContainer.left #dash .dash-separator {
-  width: 0;
-  height: 1px;
-  margin: 4px 0;
-  margin-left: 4px;
-}
-
-#dockManagerContainer.left #dash #dockManagerDashContainer {
-  padding: 10px;
-  padding-left: 0;
-  padding-right: 0;
-}
-
-#dockManagerContainer.left #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.left #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.left #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.left #dash .dash-item-container {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.left #dash .dash-item-container > * {
-  margin: 0;
-}
-
-#dockManagerContainer.left #dash .dash-item-container:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.left #dash .dash-item-container:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.left #dash .dash-item-container .app-well-app,
-#dockManagerContainer.left #dash .dash-item-container .show-apps,
-#dockManagerContainer.left #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-left: 14px;
-  padding-right: 10px;
-}
-
-#dockManagerContainer.left #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.left #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.left #dash .dash-item-container .overview-tile:first-child {
-  padding-top: 0;
-}
-
-#dockManagerContainer.left #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.left #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.left #dash .dash-item-container .overview-tile:last-child {
-  padding-bottom: 0;
-}
-
-#dockManagerContainer.left #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.left #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.left #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.left #dash .dash-item-container .overview-tile .app-grid-running-dot {
-  margin-bottom: 2px;
-}
-
-#dockManagerContainer.left #dash .dash-item-container > StButton {
-  transition-duration: 250;
-}
-
-#dockManagerContainer.left.fixed #dash .dash-background {
-  margin-right: 4px;
-}
-
 #dockManagerContainer.left.fixed #dash .dash-item-container .app-well-app,
 #dockManagerContainer.left.fixed #dash .dash-item-container .show-apps {
   padding-right: 14px;
-}
-
-.dash-label.left {
-  margin: 0;
-  -x-offset: 10px;
-  -y-offset: 0;
-}
-
-#dockManagerContainer.left.extended #dash {
-  margin: 0px;
-  padding: 0px;
-}
-
-#dockManagerContainer.left.extended #dash .dash-background {
-  margin: 0;
-  margin-left: 0;
-  padding: 0;
-  spacing: 6px;
-}
-
-#dockManagerContainer.left.extended #dash .dash-separator {
-  width: 0;
-  height: 1px;
-  margin: 4px 0;
-  margin-left: 0;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer {
-  padding: 0;
-  padding-left: 0;
-  padding-right: 0;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer > :first-child .show-apps {
-  padding-top: 8px;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:first-child {
-  padding-top: 8px;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer > :last-child .show-apps {
-  padding-bottom: 8px;
-}
-
-#dockManagerContainer.left.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:last-child {
-  padding-bottom: 8px;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container > * {
-  margin: 0;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container .app-well-app,
-#dockManagerContainer.left.extended #dash .dash-item-container .show-apps,
-#dockManagerContainer.left.extended #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-left: 10px;
-  padding-right: 10px;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.left.extended #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.left.extended #dash .dash-item-container .overview-tile:first-child {
-  padding-top: 0;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.left.extended #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.left.extended #dash .dash-item-container .overview-tile:last-child {
-  padding-bottom: 0;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.left.extended #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.left.extended #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.left.extended #dash .dash-item-container .overview-tile .app-grid-running-dot {
-  margin-bottom: 2px;
-}
-
-#dockManagerContainer.left.extended #dash .dash-item-container > StButton {
-  transition-duration: 250;
-}
-
-#dockManagerContainer.left.extended.fixed #dash .dash-background {
-  margin-right: 0;
-}
-
-#dockManagerContainer.left.extended.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.left.extended.fixed #dash .dash-item-container .show-apps {
-  padding-right: 10px;
-}
-
-.dash-label.left {
-  margin: 0;
-  -x-offset: 10px;
-  -y-offset: 0;
-}
-
-#dockManagerContainer.right #dash {
-  margin: 0px;
-  padding: 0px;
-}
-
-#dockManagerContainer.right #dash .dash-background {
-  margin: 0;
-  margin-right: 4px;
-  padding: 0;
-  spacing: 6px;
-}
-
-#dockManagerContainer.right #dash .dash-separator {
-  width: 0;
-  height: 1px;
-  margin: 4px 0;
-  margin-right: 4px;
-}
-
-#dockManagerContainer.right #dash #dockManagerDashContainer {
-  padding: 10px;
-  padding-right: 0;
-  padding-left: 0;
-}
-
-#dockManagerContainer.right #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.right #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.right #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.right #dash .dash-item-container {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.right #dash .dash-item-container > * {
-  margin: 0;
-}
-
-#dockManagerContainer.right #dash .dash-item-container:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.right #dash .dash-item-container:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.right #dash .dash-item-container .app-well-app,
-#dockManagerContainer.right #dash .dash-item-container .show-apps,
-#dockManagerContainer.right #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-right: 14px;
-  padding-left: 10px;
-}
-
-#dockManagerContainer.right #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.right #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.right #dash .dash-item-container .overview-tile:first-child {
-  padding-top: 0;
-}
-
-#dockManagerContainer.right #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.right #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.right #dash .dash-item-container .overview-tile:last-child {
-  padding-bottom: 0;
-}
-
-#dockManagerContainer.right #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.right #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.right #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.right #dash .dash-item-container .overview-tile .app-grid-running-dot {
-  margin-bottom: 2px;
-}
-
-#dockManagerContainer.right #dash .dash-item-container > StButton {
-  transition-duration: 250;
-}
-
-#dockManagerContainer.right.fixed #dash .dash-background {
-  margin-left: 4px;
 }
 
 #dockManagerContainer.right.fixed #dash .dash-item-container .app-well-app,
@@ -744,119 +239,112 @@
   padding-left: 14px;
 }
 
-.dash-label.right {
-  margin: 0;
-  -x-offset: 10px;
+.dash-label.bottom {
+  margin-bottom: 10px;
+  -x-offset: 0;
   -y-offset: 0;
 }
 
-#dockManagerContainer.right.extended #dash {
-  margin: 0px;
-  padding: 0px;
-}
-
-#dockManagerContainer.right.extended #dash .dash-background {
+#dockManagerContainer.horizontal.extended #dash .dash-background,
+#dockManagerContainer.vertical.extended #dash .dash-background {
   margin: 0;
-  margin-right: 0;
-  padding: 0;
-  spacing: 6px;
 }
 
-#dockManagerContainer.right.extended #dash .dash-separator {
-  width: 0;
-  height: 1px;
+#dockManagerContainer.horizontal.extended #dash .dash-separator,
+#dockManagerContainer.vertical.extended #dash .dash-separator {
+  margin: 0 4px;
+}
+
+#dockManagerContainer.vertical.extended #dash .dash-separator {
   margin: 4px 0;
-  margin-right: 0;
 }
 
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer {
+#dockManagerContainer.horizontal.extended #dash #dockManagerDashContainer,
+#dockManagerContainer.vertical.extended #dash #dockManagerDashContainer {
   padding: 0;
-  padding-right: 0;
+}
+
+#dockManagerContainer.horizontal.extended #dash #dockManagerDashContainer > :first-child .show-apps {
+  padding-left: 8px;
+}
+
+#dockManagerContainer.vertical.extended #dash #dockManagerDashContainer > :first-child .show-apps {
+  padding-top: 8px;
+}
+
+#dockManagerContainer.horizontal.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:first-child {
+  padding-left: 8px;
+}
+
+#dockManagerContainer.vertical.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:first-child {
+  padding-top: 8px;
+}
+
+#dockManagerContainer.horizontal.extended #dash #dockManagerDashContainer > :last-child .show-apps {
+  padding-right: 8px;
+}
+
+#dockManagerContainer.vertical.extended #dash #dockManagerDashContainer > :last-child .show-apps {
+  padding-bottom: 8px;
+}
+
+#dockManagerContainer.horizontal.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:last-child {
+  padding-right: 8px;
+}
+
+#dockManagerContainer.vertical.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:last-child {
+  padding-bottom: 8px;
+}
+
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .app-well-app,
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .show-apps,
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .overview-tile,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .app-well-app,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .show-apps,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .overview-tile {
+  padding: 10px 2px;
+}
+
+#dockManagerContainer.vertical.extended #dash .dash-item-container .app-well-app,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .show-apps,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .overview-tile {
+  padding: 2px 10px;
+}
+
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .app-well-app:first-child,
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .show-apps:first-child,
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .overview-tile:first-child {
   padding-left: 0;
 }
 
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer > #dockManagerDashScrollview:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer > :first-child .show-apps {
-  padding-top: 8px;
-}
-
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:first-child {
-  padding-top: 8px;
-}
-
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer > :last-child .show-apps {
-  padding-bottom: 8px;
-}
-
-#dockManagerContainer.right.extended #dash #dockManagerDashContainer #dockManagerDashScrollview:last-child {
-  padding-bottom: 8px;
-}
-
-#dockManagerContainer.right.extended #dash .dash-item-container {
-  margin: 2px 0;
-}
-
-#dockManagerContainer.right.extended #dash .dash-item-container > * {
-  margin: 0;
-}
-
-#dockManagerContainer.right.extended #dash .dash-item-container:first-child {
-  margin-top: 0;
-}
-
-#dockManagerContainer.right.extended #dash .dash-item-container:last-child {
-  margin-bottom: 0;
-}
-
-#dockManagerContainer.right.extended #dash .dash-item-container .app-well-app,
-#dockManagerContainer.right.extended #dash .dash-item-container .show-apps,
-#dockManagerContainer.right.extended #dash .dash-item-container .overview-tile {
-  padding: 2px 2px;
-  padding-right: 10px;
-  padding-left: 10px;
-}
-
-#dockManagerContainer.right.extended #dash .dash-item-container .app-well-app:first-child,
-#dockManagerContainer.right.extended #dash .dash-item-container .show-apps:first-child,
-#dockManagerContainer.right.extended #dash .dash-item-container .overview-tile:first-child {
+#dockManagerContainer.vertical.extended #dash .dash-item-container .app-well-app:first-child,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .show-apps:first-child,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .overview-tile:first-child {
   padding-top: 0;
 }
 
-#dockManagerContainer.right.extended #dash .dash-item-container .app-well-app:last-child,
-#dockManagerContainer.right.extended #dash .dash-item-container .show-apps:last-child,
-#dockManagerContainer.right.extended #dash .dash-item-container .overview-tile:last-child {
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .app-well-app:last-child,
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .show-apps:last-child,
+#dockManagerContainer.horizontal.extended #dash .dash-item-container .overview-tile:last-child {
+  padding-right: 0;
+}
+
+#dockManagerContainer.vertical.extended #dash .dash-item-container .app-well-app:last-child,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .show-apps:last-child,
+#dockManagerContainer.vertical.extended #dash .dash-item-container .overview-tile:last-child {
   padding-bottom: 0;
 }
 
-#dockManagerContainer.right.extended #dash .dash-item-container .app-well-app .app-well-app-running-dot,
-#dockManagerContainer.right.extended #dash .dash-item-container .app-well-app .app-grid-running-dot,
-#dockManagerContainer.right.extended #dash .dash-item-container .overview-tile .app-well-app-running-dot,
-#dockManagerContainer.right.extended #dash .dash-item-container .overview-tile .app-grid-running-dot {
-  margin-bottom: 2px;
+.dash-label.top {
+  margin-top: 10px;
+  -x-offset: 0;
+  -y-offset: 0;
 }
 
-#dockManagerContainer.right.extended #dash .dash-item-container > StButton {
-  transition-duration: 250;
-}
-
-#dockManagerContainer.right.extended.fixed #dash .dash-background {
-  margin-left: 0;
-}
-
-#dockManagerContainer.right.extended.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.right.extended.fixed #dash .dash-item-container .show-apps {
-  padding-left: 10px;
+.dash-label.left {
+  margin: 0;
+  -x-offset: 10px;
+  -y-offset: 0;
 }
 
 .dash-label.right {
