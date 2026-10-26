@@ -458,7 +458,7 @@ export class OverviewIntegration {
 
     onShowAppsButtonToggled(button) {
         const {checked} = button;
-        const {overviewControls} = this;
+        const {controls} = this;
 
         if (!Main.overview.visible) {
             this._manager.mainDock.dash.showAppsButton._fromDesktop = true;
@@ -474,7 +474,7 @@ export class OverviewIntegration {
                 this._manager.mainDock.dash.showAppsButton._fromDesktop = false;
 
             // Instead of "syncing" the stock button, let's call its callback directly.
-            overviewControls._onShowAppsButtonToggled();
+            controls._onShowAppsButtonToggled();
         }
 
         // Because we "disconnected" from the search controller, we have to manage its state.
