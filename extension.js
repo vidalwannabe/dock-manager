@@ -16,7 +16,7 @@ import * as Workspace from 'resource:///org/gnome/shell/ui/workspace.js';
 import * as WorkspacesView from 'resource:///org/gnome/shell/ui/workspacesView.js';
 
 import * as DockDash from './dash.js';
-import * as Utils from './utils.js';
+import * as Handlers from './handlers.js';
 
 // Use __() and N__() for the extension gettext domain, and the shell domain with _() and N_().
 const {gettext: __} = Extension;
@@ -97,7 +97,7 @@ const DashSlideContainer = GObject.registerClass({
         this.connect('notify::slide-x', () => this.queue_relayout());
 
         if (this.side === St.Side.TOP && DockManager.settings.dockFixed) {
-            this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+            this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
             this._signalsHandler.add(Main.panel, 'notify::height',
                 () => this.queue_relayout());
         }
@@ -218,7 +218,7 @@ const DockedDash = GObject.registerClass({
     },
 }, class DockedDash extends St.Bin {
     _init(params) {
-        this._position = Utils.getPosition();
+        this._position = DockManager.settings.dockPosition;
 
         // This is the centering actor
         super._init({
@@ -281,7 +281,7 @@ const DockedDash = GObject.registerClass({
         this._box.connect('notify::hover', this._hoverChanged.bind(this));
 
         // Connect global signals
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
         this._signalsHandler.add([
             // Monitor windows overlapping
             this._intellihide,
@@ -472,7 +472,7 @@ const DockedDash = GObject.registerClass({
         delete this._staticBox;
 
         if (this._marginLater) {
-            Utils.laterRemove(this._marginLater);
+            global.compositor.get_laters().remove(this._marginLater);
             delete this._marginLater;
         }
 
@@ -755,7 +755,7 @@ const DockedDash = GObject.registerClass({
      */
     _setupDockDwellIfNeeded() {
         if (this.autohideEnabled) {
-            this._dockWatch = Utils.getCursorTracker().connect(
+            this._dockWatch = global.backend.get_cursor_tracker().connect(
                 'position-invalidated',
                 () => this._checkDockDwellLater(...global.get_pointer()));
             this._dockDwelling = false;
@@ -857,7 +857,7 @@ const DockedDash = GObject.registerClass({
         }
 
         if (this._dockWatch) {
-            Utils.getCursorTracker().disconnect(this._dockWatch);
+            global.backend.get_cursor_tracker().disconnect(this._dockWatch);
             this._dockWatch = null;
         }
     }
@@ -1065,7 +1065,7 @@ const MonitorIsolation = class MonitorIsolation {
     constructor() {
         const {settings} = DockManager;
 
-        this._signalsHandler = new Utils.GlobalSignalsHandler();
+        this._signalsHandler = new Handlers.GlobalSignalsHandler();
 
         const updateAllDocks = () => {
             DockManager.allDocks.forEach(dock =>
@@ -1111,10 +1111,10 @@ export class DockManager {
             throw new Error('DockManager has been already initialized');
         DockManager._singleton = this;
         this._extension = extension;
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
-        this._methodInjections = new Utils.InjectionsHandler(this);
-        this._vfuncInjections = new Utils.VFuncInjectionsHandler(this);
-        this._propertyInjections = new Utils.PropertyInjectionsHandler(this);
+        this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
+        this._methodInjections = new Handlers.InjectionsHandler(this);
+        this._vfuncInjections = new Handlers.VFuncInjectionsHandler(this);
+        this._propertyInjections = new Handlers.PropertyInjectionsHandler(this);
         this._settings = this._extension.getSettings(
             'org.gnome.shell.extensions.dock-manager');
         this._mapSettingsValues();
@@ -1194,7 +1194,7 @@ export class DockManager {
         if (this._toggleLater)
             return;
 
-        this._toggleLater = Utils.laterAdd(Meta.LaterType.BEFORE_REDRAW, () => {
+        this._toggleLater = global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
             delete this._toggleLater;
             this._restoreDash();
             this._deleteDocks();
@@ -1229,7 +1229,7 @@ export class DockManager {
     _bindSettingsChanges() {
         // Connect relevant signals to the toggling function
         this._signalsHandler.addWithLabel(Labels.SETTINGS, [
-            Utils.getMonitorManager(),
+            global.backend.get_monitor_manager(),
             'monitors-changed',
             this._toggle.bind(this),
         ], [
@@ -1267,7 +1267,7 @@ export class DockManager {
 
         this._preferredMonitorIndex = this.settings.preferredMonitor;
         if (this._preferredMonitorIndex === -2) {
-            const monitorManager = Utils.getMonitorManager();
+            const monitorManager = global.backend.get_monitor_manager();
             this._preferredMonitorIndex = monitorManager.get_monitor_for_connector(
                 this.settings.preferredMonitorByConnector);
         } else if (this._preferredMonitorIndex >= 0) {
@@ -1551,7 +1551,7 @@ export class DockManager {
                 maybeAdjustBoxToDock(undefined, workAreaBox, spacing);
                 const oldStartY = workAreaBox.y1;
 
-                const propertyInjections = new Utils.PropertyInjectionsHandler();
+                const propertyInjections = new Handlers.PropertyInjectionsHandler();
                 propertyInjections.add(Main.layoutManager.panelBox, 'height', {value: startY});
 
                 if (Main.layoutManager.panelBox.y === Main.layoutManager.primaryMonitor.y)
@@ -1838,7 +1838,7 @@ export class DockManager {
     destroy() {
         this.emit('destroy');
         if (this._toggleLater) {
-            Utils.laterRemove(this._toggleLater);
+            global.compositor.get_laters().remove(this._toggleLater);
             delete this._toggleLater;
         }
         this._restoreDash();
@@ -1894,7 +1894,7 @@ export class Intellihide {
         // Load settings
         this._monitorIndex = monitorIndex;
 
-        this._signalsHandler = new Utils.GlobalSignalsHandler();
+        this._signalsHandler = new Handlers.GlobalSignalsHandler();
         this._focusApp = null; // The application whose window is focused.
         this._topApp = null; // The application whose window is on top on the monitor with the dock.
 
@@ -1927,7 +1927,7 @@ export class Intellihide {
             this._checkOverlap.bind(this),
         ], [
             // update wne monitor changes, for instance in multimonitor when monitor are attached
-            Utils.getMonitorManager(),
+            global.backend.get_monitor_manager(),
             'monitors-changed',
             this._checkOverlap.bind(this),
         ]);
@@ -2153,7 +2153,7 @@ export const PositionStyleClass = Object.freeze([
  */
 export class ThemeManager {
     constructor(dock) {
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
         this._bindSettingsChanges();
         this._actor = dock;
         this._dash = dock.dash;
@@ -2172,7 +2172,7 @@ export class ThemeManager {
         this._signalsHandler.addWithLabel(Labels.THEME_CHANGED,
             St.ThemeContext.get_for_stage(global.stage), 'changed',
             () => this._queueUpdateCustomTheme(),
-            Utils.SignalsHandlerFlags.CONNECT_AFTER);
+            Handlers.SignalsHandlerFlags.CONNECT_AFTER);
 
         const maybeUpdateCustomTheme = () => {
             if (this._actor.mapped) {
@@ -2186,7 +2186,7 @@ export class ThemeManager {
 
         this._signalsHandler.add(this._actor, 'notify::mapped',
             () => maybeUpdateCustomTheme(),
-            Utils.SignalsHandlerFlags.CONNECT_AFTER);
+            Handlers.SignalsHandlerFlags.CONNECT_AFTER);
 
         maybeUpdateCustomTheme();
 
@@ -2210,7 +2210,7 @@ export class ThemeManager {
         if (this._updateLater)
             return;
 
-        this._updateLater = Utils.laterAdd(Meta.LaterType.BEFORE_REDRAW, () => {
+        this._updateLater = global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
             this._updateLater = 0;
             this.updateCustomTheme();
         });
@@ -2220,7 +2220,7 @@ export class ThemeManager {
         if (!this._updateLater)
             return;
 
-        Utils.laterRemove(this._updateLater);
+        global.compositor.get_laters().remove(this._updateLater);
         delete this._updateLater;
     }
 
@@ -2264,7 +2264,7 @@ export class ThemeManager {
         // Remove prior style edits
         this._dash._background.set_style(null);
 
-        const position = Utils.getPosition(settings);
+        const position = DockManager.settings.dockPosition;
 
         // obtain theme border settings
         const themeNode = this._dash._background.get_theme_node();

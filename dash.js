@@ -16,7 +16,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import * as AppIcons from './appIcons.js';
 import * as Docking from './extension.js';
-import * as Utils from './utils.js';
+import * as Handlers from './handlers.js';
 
 const Labels = Object.freeze({
     FIRST_LAST_CHILD_WORKAROUND: Symbol('first-last-child-workaround'),
@@ -140,12 +140,12 @@ export const DockDash = GObject.registerClass({
         this._maxHeight = -1;
         this.iconSize = ICON_SIZE;
         this._shownInitially = false;
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
 
         this._separator = null;
 
         this._monitorIndex = monitorIndex;
-        this._position = Utils.getPosition();
+        this._position = Docking.DockManager.settings.dockPosition;
         this._isHorizontal = (this._position === St.Side.TOP) ||
                                (this._position === St.Side.BOTTOM);
 
@@ -205,7 +205,7 @@ export const DockDash = GObject.registerClass({
 
         this._box._delegate = this;
         this._boxContainer.add_child(this._box);
-        Utils.addActor(this._scrollView, this._boxContainer);
+        this._scrollView.add_child(this._boxContainer);
         this._dashContainer.add_child(this._scrollView);
 
         this._showAppsIcon = new AppIcons.DockShowAppsIcon(this._position);
@@ -386,7 +386,7 @@ export const DockDash = GObject.registerClass({
             if (ret === DND.DragMotionResult.CONTINUE)
                 return ret;
         } else {
-            const propertyInjections = new Utils.PropertyInjectionsHandler();
+            const propertyInjections = new Handlers.PropertyInjectionsHandler();
             propertyInjections.add(this._box, 'width', {
                 get: () => this._box.get_children().reduce((a, c) => a + c.height, 0),
             });
@@ -902,7 +902,7 @@ export const DockDash = GObject.registerClass({
 });
 
 /**
- * This is a copy of the same function in utils.js, but also adjust horizontal scrolling
+ * This is a copy of the same function in GNOME Shell's misc/util.js, but also adjust horizontal scrolling
  * and perform few further checks on the current value to avoid changing the values when
  * it would be clamp to the current one in any case.
  * Return the amount of shift applied

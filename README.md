@@ -36,7 +36,7 @@ Click focuses an application, or minimizes it when it is focused already; Shift+
 | `extension.js` | The dock: docking, intellihide, theming and the extension entry point |
 | `dash.js` | The row of icons inside the dock |
 | `appIcons.js` | Each icon, its menu and the running dots |
-| `utils.js` | Helpers shared by every file |
+| `handlers.js` | Connecting signals and replacing GNOME's methods, undone when the dock is disabled |
 | `prefs.js` | The preferences window |
 | `stylesheet.css` | The dock's layout |
 | `schemas/` | The settings |

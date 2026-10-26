@@ -21,7 +21,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import * as Docking from './extension.js';
-import * as Utils from './utils.js';
+import * as Handlers from './handlers.js';
 
 // Use __() and N__() for the extension gettext domain, and the shell domain with _() and N_().
 const {gettext: __, ngettext: N__} = Extension;
@@ -79,7 +79,7 @@ export const DockAbstractAppIcon = GObject.registerClass({
 
         // a prefix is required to avoid conflicting with the parent class variable
         this.monitorIndex = monitorIndex;
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
         this._indicator = new RunningIndicatorDots(this);
         this._urgentWindows = new Set();
 
@@ -309,7 +309,7 @@ export const DockAbstractAppIcon = GObject.registerClass({
                     // scrollable so the minimum height is smaller than the natural height.
                     const monitorIndex = Main.layoutManager.findIndexForActor(this);
                     const workArea = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
-                    const position = Utils.getPosition();
+                    const position = Docking.DockManager.settings.dockPosition;
                     const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
                     const isHorizontal = position === St.Side.TOP || position === St.Side.BOTTOM;
                     // If horizontal also remove the height of the dash
@@ -504,9 +504,9 @@ export function makeAppIcon(app, monitorIndex) {
  */
 const DockAppIconMenu = class DockAppIconMenu extends PopupMenu.PopupMenu {
     constructor(source) {
-        super(source, 0.5, Utils.getPosition());
+        super(source, 0.5, Docking.DockManager.settings.dockPosition);
 
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
 
         // We want to keep the item hovered while the menu is up
         this.blockSourceEvents = true;
@@ -923,7 +923,7 @@ export function itemShowLabel() {
 
     let x, y, xOffset, yOffset;
 
-    const position = Utils.getPosition();
+    const position = Docking.DockManager.settings.dockPosition;
     const labelOffset = node.get_length('-x-offset');
 
     switch (position) {
@@ -998,8 +998,8 @@ class IndicatorDrawingArea extends St.DrawingArea {
 class RunningIndicatorDots {
     constructor(source) {
         this._source = source;
-        this._signalsHandler = new Utils.GlobalSignalsHandler(source);
-        this._side = Utils.getPosition();
+        this._signalsHandler = new Handlers.GlobalSignalsHandler(source);
+        this._side = Docking.DockManager.settings.dockPosition;
         this._dominantColorExtractor = new DominantColorExtractor(source.app);
 
         // I use opacity to hide the default dot because the show/hide function
@@ -1118,7 +1118,7 @@ class RunningIndicatorDots {
         const n = this._number;
 
         cr.setLineWidth(this._borderWidth);
-        Utils.cairoSetSourceColor(cr, this._borderColor);
+        cr.setSourceColor(this._borderColor);
 
         // draw for the bottom case:
         cr.translate(
@@ -1133,7 +1133,7 @@ class RunningIndicatorDots {
         }
 
         cr.strokePreserve();
-        Utils.cairoSetSourceColor(cr, this._bodyColor);
+        cr.setSourceColor(this._bodyColor);
         cr.fill();
     }
 
@@ -1146,6 +1146,122 @@ class RunningIndicatorDots {
         this._signalsHandler = null;
     }
 }
+
+// ---------- Dominant color ----------
+
+class ColorUtils {
+    // Darken or brigthen color by a fraction dlum
+    // Each rgb value is modified by the same fraction.
+    // Return "#rrggbb" string
+    static ColorLuminance(r, g, b, dlum) {
+        let rgbString = '#';
+
+        rgbString += ColorUtils._decimalToHex(Math.round(Math.min(Math.max(r * (1 + dlum), 0), 255)), 2);
+        rgbString += ColorUtils._decimalToHex(Math.round(Math.min(Math.max(g * (1 + dlum), 0), 255)), 2);
+        rgbString += ColorUtils._decimalToHex(Math.round(Math.min(Math.max(b * (1 + dlum), 0), 255)), 2);
+
+        return rgbString;
+    }
+
+    // Convert decimal to an hexadecimal string adding the desired padding
+    static _decimalToHex(d, padding) {
+        let hex = d.toString(16);
+        while (hex.length < padding)
+            hex = `0${hex}`;
+        return hex;
+    }
+
+    // Convert hsv ([0-1, 0-1, 0-1]) to rgb ([0-255, 0-255, 0-255]).
+    // Following algorithm in https://en.wikipedia.org/wiki/HSL_and_HSV
+    // here with h = [0,1] instead of [0, 360]
+    // Accept either (h,s,v) independently or  {h:h, s:s, v:v} object.
+    // Return {r:r, g:g, b:b} object.
+    static HSVtoRGB(h, s, v) {
+        if (arguments.length === 1)
+            ({s, v, h} = h);
+
+        let r, g, b;
+        const c = v * s;
+        const h1 = h * 6;
+        const x = c * (1 - Math.abs(h1 % 2 - 1));
+        const m = v - c;
+
+        if (h1 <= 1) {
+            r = c + m;
+            g = x + m;
+            b = m;
+        } else if (h1 <= 2) {
+            r = x + m;
+            g = c + m;
+            b = m;
+        } else if (h1 <= 3) {
+            r = m;
+            g = c + m;
+            b = x + m;
+        } else if (h1 <= 4) {
+            r = m;
+            g = x + m;
+            b = c + m;
+        } else if (h1 <= 5) {
+            r = x + m;
+            g = m;
+            b = c + m;
+        } else {
+            r = c + m;
+            g = m;
+            b = x + m;
+        }
+
+        return {
+            r: Math.round(r * 255),
+            g: Math.round(g * 255),
+            b: Math.round(b * 255),
+        };
+    }
+
+    // Convert rgb ([0-255, 0-255, 0-255]) to hsv ([0-1, 0-1, 0-1]).
+    // Following algorithm in https://en.wikipedia.org/wiki/HSL_and_HSV
+    // here with h = [0,1] instead of [0, 360]
+    // Accept either (r,g,b) independently or {r:r, g:g, b:b} object.
+    // Return {h:h, s:s, v:v} object.
+    static RGBtoHSV(r, g, b) {
+        if (arguments.length === 1)
+            ({r, g, b} = r);
+
+        let h, s;
+
+        const M = Math.max(r, g, b);
+        const m = Math.min(r, g, b);
+        const c = M - m;
+
+        if (c === 0)
+            h = 0;
+        else if (M === r)
+            h = ((g - b) / c) % 6;
+        else if (M === g)
+            h = (b - r) / c + 2;
+        else
+            h = (r - g) / c + 4;
+
+        h /= 6;
+        const v = M / 255;
+        if (M !== 0)
+            s = c / M;
+        else
+            s = 0;
+
+        return {
+            h,
+            s,
+            v,
+        };
+    }
+}
+
+/**
+ * Manage function injection: both instances and prototype can be overridden
+ * and restored
+ */
 
 // Global icon cache of the dominant colors.
 const iconCacheMap = new Map();
@@ -1274,19 +1390,19 @@ class DominantColorExtractor {
             g = gTotal / total,
             b = bTotal / total;
 
-        const hsv = Utils.ColorUtils.RGBtoHSV(r * 255, g * 255, b * 255);
+        const hsv = ColorUtils.RGBtoHSV(r * 255, g * 255, b * 255);
 
         if (hsv.s > 0.15)
             hsv.s = 0.65;
         hsv.v = 0.90;
 
-        const rgb = Utils.ColorUtils.HSVtoRGB(hsv.h, hsv.s, hsv.v);
+        const rgb = ColorUtils.HSVtoRGB(hsv.h, hsv.s, hsv.v);
 
         // Cache the result.
         const backgroundColor = {
-            lighter:  Utils.ColorUtils.ColorLuminance(rgb.r, rgb.g, rgb.b, 0.2),
-            original: Utils.ColorUtils.ColorLuminance(rgb.r, rgb.g, rgb.b, 0),
-            darker:   Utils.ColorUtils.ColorLuminance(rgb.r, rgb.g, rgb.b, -0.5),
+            lighter:  ColorUtils.ColorLuminance(rgb.r, rgb.g, rgb.b, 0.2),
+            original: ColorUtils.ColorLuminance(rgb.r, rgb.g, rgb.b, 0),
+            darker:   ColorUtils.ColorLuminance(rgb.r, rgb.g, rgb.b, -0.5),
         };
 
         if (iconCacheMap.size >= MAX_CACHED_ITEMS) {
