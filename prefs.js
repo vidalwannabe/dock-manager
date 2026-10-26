@@ -112,15 +112,13 @@ function spinRow(settings, key, title, lower, upper, step, digits) {
     return row;
 }
 
-// Position on screen. The setting keeps the order Top, Right, Bottom, Left; in right to left
-// languages its Left is on the right.
+// Position on screen. The setting keeps the order Top, Right, Bottom, Left.
 function positionChoice(settings) {
-    const rtl = Gtk.Widget.get_default_direction() === Gtk.TextDirection.RTL;
     const positions = [
-        [3, rtl ? __('Right') : __('Left')],
+        [3, __('Left')],
         [2, __('Bottom')],
         [0, __('Top')],
-        [1, rtl ? __('Left') : __('Right')],
+        [1, __('Right')],
     ];
     const row = new Adw.ComboRow({
         title: __('Position on screen'),

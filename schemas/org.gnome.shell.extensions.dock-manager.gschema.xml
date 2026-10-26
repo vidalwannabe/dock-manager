@@ -34,11 +34,6 @@
       <summary>Use application icon dominant color for the indicator color</summary>
       <description></description>
     </key>
-    <key type="b" name="manualhide">
-      <default>false</default>
-      <summary>Dock not shown on desktop</summary>
-      <description>Enable or disable manualhide mode</description>
-    </key>
     <key type="b" name="autohide">
       <default>true</default>
       <summary>Dock shown on mouse over</summary>

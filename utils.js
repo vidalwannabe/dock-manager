@@ -1,12 +1,8 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 import Clutter from 'gi://Clutter';
-import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
-import Shell from 'gi://Shell';
-import St from 'gi://St';
 
 import * as Docking from './extension.js';
 
@@ -520,153 +516,11 @@ export class PropertyInjectionsHandler extends BasicHandler {
 }
 
 /**
- * Return the actual position reverseing left and right in rtl
+ * Return the dock's side of the screen
  */
 export function getPosition() {
-    const position = Docking.DockManager.settings.dockPosition;
-    if (Clutter.get_default_text_direction() === Clutter.TextDirection.RTL) {
-        if (position === St.Side.LEFT)
-            return St.Side.RIGHT;
-        else if (position === St.Side.RIGHT)
-            return St.Side.LEFT;
-    }
-    return position;
+    return Docking.DockManager.settings.dockPosition;
 }
-
-/**
- * Construct a map of gtk application window object paths to MetaWindows.
- */
-export function getWindowsByObjectPath() {
-    const windowsByObjectPath = new Map();
-
-    global.display.list_all_windows().forEach(w => {
-        const path = w.get_gtk_window_object_path();
-        if (path)
-            windowsByObjectPath.set(path, w);
-    });
-
-    return windowsByObjectPath;
-}
-
-/**
- * Re-implements shell_app_compare so that can be used to resort running apps
- *
- * @param appA
- * @param appB
- */
-export function shellAppCompare(appA, appB) {
-    if (appA.state !== appB.state) {
-        if (appA.state === Shell.AppState.RUNNING)
-            return -1;
-        return 1;
-    }
-
-    const windowsA = appA.get_windows();
-    const windowsB = appB.get_windows();
-
-    const isMinimized = windows => !windows.some(w => w.showing_on_its_workspace());
-    const minimizedB = isMinimized(windowsB);
-    if (isMinimized(windowsA) !== minimizedB) {
-        if (minimizedB)
-            return -1;
-        return 1;
-    }
-
-    if (appA.state === Shell.AppState.RUNNING) {
-        if (windowsA.length && !windowsB.length)
-            return -1;
-        else if (!windowsA.length && windowsB.length)
-            return 1;
-
-        const lastUserTime = windows =>
-            Math.max(...windows.map(w => w.get_user_time()));
-        return lastUserTime(windowsB) - lastUserTime(windowsA);
-    }
-
-    return 0;
-}
-
-/**
- * Re-implements shell_app_compare_windows
- *
- * @param winA
- * @param winB
- */
-export function shellWindowsCompare(winA, winB) {
-    const activeWorkspace = global.workspaceManager.get_active_workspace();
-    const wsA = winA.get_workspace() === activeWorkspace;
-    const wsB = winB.get_workspace() === activeWorkspace;
-
-    if (wsA && !wsB)
-        return -1;
-    else if (!wsA && wsB)
-        return 1;
-
-    const visA = winA.showing_on_its_workspace();
-    const visB = winB.showing_on_its_workspace();
-
-    if (visA && !visB)
-        return -1;
-    else if (!visA && visB)
-        return 1;
-
-    return winB.get_user_time() - winA.get_user_time();
-}
-
-export const CancellableChild = GObject.registerClass({
-    Properties: {
-        'parent': GObject.ParamSpec.object(
-            'parent', 'parent', 'parent',
-            GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT_ONLY,
-            Gio.Cancellable.$gtype),
-    },
-},
-class CancellableChild extends Gio.Cancellable {
-    _init(parent) {
-        if (parent && !(parent instanceof Gio.Cancellable))
-            throw TypeError('Not a valid cancellable');
-
-        super._init({parent});
-
-        if (parent?.is_cancelled()) {
-            this.cancel();
-            return;
-        }
-
-        this._connectToParent();
-    }
-
-    _connectToParent() {
-        this._connectId = this.parent?.connect(() => {
-            this._realCancel();
-
-            if (this._disconnectIdle)
-                return;
-
-            this._disconnectIdle = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                delete this._disconnectIdle;
-                this._disconnectFromParent();
-                return GLib.SOURCE_REMOVE;
-            });
-        });
-    }
-
-    _disconnectFromParent() {
-        if (this._connectId && !this._disconnectIdle) {
-            this.parent.disconnect(this._connectId);
-            delete this._connectId;
-        }
-    }
-
-    _realCancel() {
-        Gio.Cancellable.prototype.cancel.call(this);
-    }
-
-    cancel() {
-        this._disconnectFromParent();
-        this._realCancel();
-    }
-});
 
 /**
  *

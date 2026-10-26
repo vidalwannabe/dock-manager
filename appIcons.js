@@ -21,7 +21,6 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import * as Docking from './extension.js';
-import * as Locations from './locations.js';
 import * as Utils from './utils.js';
 
 // Use __() and N__() for the extension gettext domain, and the shell domain with _() and N_().
@@ -486,37 +485,11 @@ const DockAppIcon = GObject.registerClass({
     }
 });
 
-const DockLocationAppIcon = GObject.registerClass({
-}, class DockLocationAppIcon extends DockAbstractAppIcon {
-    _init(app, monitorIndex) {
-        if (!(app.appInfo instanceof Locations.LocationAppInfo))
-            throw new Error('Provided application %s is not a Location'.format(app));
-
-        super._init(app, monitorIndex);
-
-        this._signalsHandler.add(global.display, 'notify::focus-window',
-            () => this._updateFocusState());
-
-        this._signalsHandler.add(this.app, 'notify::icon', () => this.icon.update());
-    }
-
-    get location() {
-        return this.app.location;
-    }
-
-    _updateFocusState() {
-        this.focused = this.app.isFocused && this.running;
-    }
-});
-
 /**
  * @param app
  * @param monitorIndex
  */
 export function makeAppIcon(app, monitorIndex) {
-    if (app.appInfo instanceof Locations.LocationAppInfo)
-        return new DockLocationAppIcon(app, monitorIndex);
-
     return new DockAppIcon(app, monitorIndex);
 }
 
@@ -617,23 +590,6 @@ const DockAppIconMenu = class DockAppIconMenu extends PopupMenu.PopupMenu {
                     this.emit('activate-window', null);
                 });
                 this._appendSeparator();
-            }
-
-            if (!this.sourceActor.updating &&
-                Docking.DockManager.getDefault().discreteGpuAvailable &&
-                app.state === Shell.AppState.STOPPED) {
-                const appPrefersNonDefaultGPU = appInfo.get_boolean('PrefersNonDefaultGPU');
-                const gpuPref = appPrefersNonDefaultGPU
-                    ? Shell.AppLaunchGpu.DEFAULT
-                    : Shell.AppLaunchGpu.DISCRETE;
-                const gpuMenuItem = this._appendMenuItem(appPrefersNonDefaultGPU
-                    ? __('Launch using Integrated Graphics Card')
-                    : __('Launch using Discrete Graphics Card'));
-                gpuMenuItem.connect('activate', () => {
-                    this.sourceActor.animateLaunch();
-                    app.launch(0, -1, gpuPref);
-                    this.emit('activate-window', null);
-                });
             }
 
             for (let i = 0; i < actions.length; i++) {

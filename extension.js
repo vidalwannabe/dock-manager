@@ -8,17 +8,14 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Extension from 'resource:///org/gnome/shell/extensions/extension.js';
-import * as AppDisplay from 'resource:///org/gnome/shell/ui/appDisplay.js';
 import * as AppMenu from 'resource:///org/gnome/shell/ui/appMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as OverviewControls from 'resource:///org/gnome/shell/ui/overviewControls.js';
 import * as SwitcherPopup from 'resource:///org/gnome/shell/ui/switcherPopup.js';
 import * as Workspace from 'resource:///org/gnome/shell/ui/workspace.js';
-import * as WorkspaceSwitcherPopup from 'resource:///org/gnome/shell/ui/workspaceSwitcherPopup.js';
 import * as WorkspacesView from 'resource:///org/gnome/shell/ui/workspacesView.js';
 
 import * as DockDash from './dash.js';
-import * as Locations from './locations.js';
 import * as Utils from './utils.js';
 
 // Use __() and N__() for the extension gettext domain, and the shell domain with _() and N_().
@@ -231,8 +228,6 @@ const DockedDash = GObject.registerClass({
             style_class: PositionStyleClass[this._position],
         });
 
-        this._rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
-
         // Load settings
         const {settings} = DockManager;
         this._isHorizontal = (this._position === St.Side.TOP) || (this._position === St.Side.BOTTOM);
@@ -375,7 +370,6 @@ const DockedDash = GObject.registerClass({
         // Load optional features that need to be activated for one dock only
         if (this.isMain)
             this._enableExtraFeatures();
-        this._enableScrollWorkspaceSwitch();
 
         // Add dash container actor and the container to the Chrome.
         this.set_child(this._slider);
@@ -475,7 +469,6 @@ const DockedDash = GObject.registerClass({
         this.dash.destroy();
         this._intellihide.destroy();
         this._themeManager.destroy();
-        this._workspaceSwitcherPopup?.destroy();
         delete this._staticBox;
 
         if (this._marginLater) {
@@ -489,10 +482,6 @@ const DockedDash = GObject.registerClass({
         this._removeDockWatch();
         this._cancelDockDwell();
 
-        if (this._scrollWorkspaceSwitchDeadTimeId) {
-            GLib.source_remove(this._scrollWorkspaceSwitchDeadTimeId);
-            delete this._scrollWorkspaceSwitchDeadTimeId;
-        }
     }
 
     _prepareStartupAnimation() {
@@ -550,12 +539,6 @@ const DockedDash = GObject.registerClass({
             },
         ], [
             settings,
-            'changed::manualhide',
-            () => {
-                this._updateVisibilityMode();
-            },
-        ], [
-            settings,
             'changed::autohide',
             () => {
                 this._updateVisibilityMode();
@@ -602,7 +585,7 @@ const DockedDash = GObject.registerClass({
      */
     _updateVisibilityMode() {
         const {settings} = DockManager;
-        if (DockManager.settings.dockFixed || DockManager.settings.manualhide) {
+        if (DockManager.settings.dockFixed) {
             this.autohideEnabled = false;
             this.intellihideEnabled = false;
         } else {
@@ -622,13 +605,6 @@ const DockedDash = GObject.registerClass({
      * overview visibility
      */
     updateDashVisibility() {
-        if (DockManager.settings.manualhide) {
-            this._ignoreHover = true;
-            this._removeAnimations();
-            this._animateOut(0, 0);
-            return;
-        }
-
         if (Main.overview.visibleTarget)
             return;
 
@@ -708,9 +684,6 @@ const DockedDash = GObject.registerClass({
     }
 
     showDock() {
-        if (DockManager.settings.manualhide)
-            return;
-
         this._delayedHide = false;
         if ((this.dockState === State.HIDDEN) || (this.dockState === State.HIDING)) {
             if (this.dockState === State.HIDING)
@@ -1083,111 +1056,10 @@ const DockedDash = GObject.registerClass({
             {focusCallback: timestamp => this._onAccessibilityFocus(timestamp)});
     }
 
-    /**
-     * Switch workspace by scrolling over the dock
-     */
-    _enableScrollWorkspaceSwitch() {
-        this._signalsHandler.add(this._box, 'scroll-event', (_, e) => onScrollEvent(e));
-
-        // This was inspired to desktop-scroller@obsidien.github.com
-        const onScrollEvent = event => {
-            // When in overview change workspace only in windows view
-            if (Main.overview.visible)
-                return false;
-
-            const activeWs = global.workspace_manager.get_active_workspace();
-            let direction = null;
-
-            let prevDirection, nextDirection;
-            if (global.workspace_manager.layout_columns > global.workspace_manager.layout_rows) {
-                prevDirection = Meta.MotionDirection.UP;
-                nextDirection = Meta.MotionDirection.DOWN;
-            } else {
-                prevDirection = Meta.MotionDirection.LEFT;
-                nextDirection = Meta.MotionDirection.RIGHT;
-            }
-
-            switch (event.get_scroll_direction()) {
-            case Clutter.ScrollDirection.UP:
-                direction = prevDirection;
-                break;
-            case Clutter.ScrollDirection.DOWN:
-                direction = nextDirection;
-                break;
-            case Clutter.ScrollDirection.SMOOTH: {
-                const [dx_, dy] = event.get_scroll_delta();
-                if (dy < 0)
-                    direction = prevDirection;
-                else if (dy > 0)
-                    direction = nextDirection;
-            }
-                break;
-            }
-
-            if (direction) {
-                // Prevent scroll events from triggering too many workspace switches
-                // by adding a 250ms dead time between each scroll event.
-                // Useful on laptops when using a touch pad.
-
-                // During the deadtime do nothing
-                if (this._scrollWorkspaceSwitchDeadTimeId) {
-                    return false;
-                } else {
-                    this._scrollWorkspaceSwitchDeadTimeId = GLib.timeout_add(
-                        GLib.PRIORITY_DEFAULT, 250, () => {
-                            this._scrollWorkspaceSwitchDeadTimeId = 0;
-                        });
-                }
-
-                let ws;
-
-                ws = activeWs.get_neighbor(direction);
-
-                if (!Main.wm._workspaceSwitcherPopup) {
-                    // Support Workspace Grid extension showing their custom
-                    // Grid Workspace Switcher
-                    if (global.workspace_manager.workspace_grid !== undefined) {
-                        Main.wm._workspaceSwitcherPopup =
-                            global.workspace_manager.workspace_grid.getWorkspaceSwitcherPopup();
-                    } else {
-                        Main.wm._workspaceSwitcherPopup = new WorkspaceSwitcherPopup.WorkspaceSwitcherPopup();
-                        this._workspaceSwitcherPopup = Main.wm._workspaceSwitcherPopup;
-
-                        this._signalsHandler.add(Main.wm._workspaceSwitcherPopup, 'destroy', actor => {
-                            delete this._workspaceSwitcherPopup;
-                            if (Main.wm._workspaceSwitcherPopup === actor)
-                                delete Main.wm._workspaceSwitcherPopup;
-                        });
-                    }
-                }
-                // Set the actor non reactive, so that it doesn't prevent the
-                // clicks events from reaching the dash actor. I can't see a reason
-                // why it should be reactive.
-                Main.wm._workspaceSwitcherPopup.reactive = false;
-
-                // If Workspace Grid is installed, let them handle the scroll behavior.
-                if (global.workspace_manager.workspace_grid !== undefined)
-                    ws = global.workspace_manager.workspace_grid.actionMoveWorkspace(direction);
-                else
-                    Main.wm.actionMoveWorkspace(ws);
-
-                // Do not show workspaceSwitcher in overview
-                if (!Main.overview.visible)
-                    Main.wm._workspaceSwitcherPopup.display(ws.index());
-
-                return true;
-            } else {
-                return false;
-            }
-        };
-    }
 });
 
 /**
- * Isolate overview to open new windows for inactive apps
- * Note: the future implementation is not fully contained here.
- * Some bits are around in other methods of other classes.
- * This class just take care of enabling/disabling the option.
+ * Redisplays the docks when windows change monitor, while monitors are isolated.
  */
 const MonitorIsolation = class MonitorIsolation {
     constructor() {
@@ -1251,28 +1123,10 @@ export class DockManager {
 
         this._oldDash = Main.overview.isDummy ? null : Main.overview.dash;
         this._signalsHandler.add(this._oldDash, 'destroy', () => (this._oldDash = null));
-        this._discreteGpuAvailable = AppDisplay.discreteGpuAvailable;
         this._windowTracker = Shell.WindowTracker.get_default();
-
-        if (this._discreteGpuAvailable === undefined) {
-            const updateDiscreteGpuAvailable = () => {
-                const switcherooProxy = global.get_switcheroo_control();
-                if (switcherooProxy) {
-                    const prop = switcherooProxy.get_cached_property('HasDualGpu');
-                    this._discreteGpuAvailable = prop?.unpack() ?? false;
-                } else {
-                    this._discreteGpuAvailable = false;
-                }
-            };
-            this._signalsHandler.add(global, 'notify::switcheroo-control',
-                () => updateDiscreteGpuAvailable());
-            updateDiscreteGpuAvailable();
-        }
 
         // Connect relevant signals to the toggling function
         this._bindSettingsChanges();
-
-        this._createLocations();
 
         /* Array of all the docks created */
         this._allDocks = [];
@@ -1328,30 +1182,12 @@ export class DockManager {
         return this._windowTracker;
     }
 
-    get fm1Client() {
-        return this._fm1Client;
-    }
-
     get mainDock() {
         return this._allDocks[0] ?? null;
     }
 
-    get removables() {
-        return this._removables;
-    }
-
-    get discreteGpuAvailable() {
-        return AppDisplay.discreteGpuAvailable || this._discreteGpuAvailable;
-    }
-
     getDockByMonitor(monitorIndex) {
         return this._allDocks.find(d => d.monitorIndex === monitorIndex);
-    }
-
-    // Mounted volumes and devices, and network volumes, are always in the dock.
-    _createLocations() {
-        this._fm1Client = new Locations.FileManager1Client();
-        this._removables = new Locations.Removables();
     }
 
     _toggle() {
@@ -1416,14 +1252,6 @@ export class DockManager {
             this._settings,
             'changed::dock-position',
             this._toggle.bind(this),
-        ], [
-            this._settings,
-            'changed::extend-height',
-            () => this._adjustPanelCorners(),
-        ], [
-            this._settings,
-            'changed::dock-fixed',
-            () => this._adjustPanelCorners(),
         ]);
     }
 
@@ -1472,9 +1300,6 @@ export class DockManager {
 
         // Make the necessary changes to Main.overview.dash
         this._prepareMainDash();
-
-        // Adjust corners if necessary
-        this._adjustPanelCorners();
 
         if (this.settings.multiMonitor) {
             const nMon = Main.layoutManager.monitors.length;
@@ -2018,15 +1843,8 @@ export class DockManager {
         }
         this._restoreDash();
         this._deleteDocks();
-        this._revertPanelCorners();
         if (this._oldSelectorMargin)
             this.searchController.margin_bottom = this._oldSelectorMargin;
-        if (this._fm1Client) {
-            this._fm1Client.destroy();
-            this._fm1Client = null;
-        }
-        this._removables?.destroy();
-        this._removables = null;
         this._iconTheme = null;
         this._settings = null;
         this._windowTracker = null;
@@ -2036,37 +1854,6 @@ export class DockManager {
         DockManager._singleton = null;
     }
 
-    /**
-     * Adjust Panel corners, remove this when 41 won't be supported anymore
-     */
-    _adjustPanelCorners() {
-        if (!this._hasPanelCorners())
-            return;
-
-        const position = Utils.getPosition();
-        const isHorizontal = (position === St.Side.TOP) || (position === St.Side.BOTTOM);
-        const dockOnPrimary  = this._settings.multiMonitor ||
-                             this._preferredMonitorIndex === Main.layoutManager.primaryIndex;
-
-        if (!isHorizontal && dockOnPrimary && this.settings.dockExtended && this.settings.dockFixed) {
-            Main.panel._rightCorner.hide();
-            Main.panel._leftCorner.hide();
-        } else {
-            this._revertPanelCorners();
-        }
-    }
-
-    _revertPanelCorners() {
-        if (!this._hasPanelCorners())
-            return;
-
-        Main.panel._leftCorner.show();
-        Main.panel._rightCorner.show();
-    }
-
-    _hasPanelCorners() {
-        return !!Main.panel?._rightCorner && !!Main.panel?._leftCorner;
-    }
 }
 Signals.addSignalMethods(DockManager.prototype);
 
@@ -2096,7 +1883,6 @@ const handledWindowTypes = [
 ];
 
 // List of applications, ignore windows of these applications in considering intellihide
-const ignoreApps = ['com.rastersoft.ding', 'com.desktop.ding'];
 
 /**
  * A rough and ugly implementation of the intellihide behaviour.
@@ -2309,11 +2095,6 @@ export class Intellihide {
 
         // Skip windows of other apps
         if (this._focusApp) {
-            // The DropDownTerminal extension is not an application per se
-            // so we match its window by wm class instead
-            if (metaWin.get_wm_class() === 'DropDownTerminalWindow')
-                return true;
-
             const {windowTracker} = DockManager;
             const currentApp = windowTracker.get_window_app(metaWin);
             const focusWindow = global.display.get_focus_window();
@@ -2342,17 +2123,6 @@ export class Intellihide {
 
         if (!metaWindow)
             return false;
-
-        // The DING extension desktop window needs to be excluded
-        // so we match its window by application id and window property.
-        const wmApp = metaWindow.get_gtk_application_id();
-        if (ignoreApps.includes(wmApp) && metaWindow.is_skip_taskbar())
-            return false;
-
-        // The DropDownTerminal extension uses the POPUP_MENU window type hint
-        // so we match its window by wm class instead
-        if (metaWindow.get_wm_class() === 'DropDownTerminalWindow')
-            return true;
 
         const wtype = metaWindow.get_window_type();
         for (let i = 0; i < handledWindowTypes.length; i++) {
@@ -2505,10 +2275,7 @@ export class ThemeManager {
         // corner, also removing bottom border and bottom-right corner styles
         let borderMissingStyle = '';
 
-        if (this._rtl && (position !== St.Side.RIGHT)) {
-            borderMissingStyle = `border-right: ${borderWidth}px solid ${
-                borderColor.to_string()};`;
-        } else if (!this._rtl && (position !== St.Side.LEFT)) {
+        if (position !== St.Side.LEFT) {
             borderMissingStyle = `border-left: ${borderWidth}px solid ${
                 borderColor.to_string()};`;
         }

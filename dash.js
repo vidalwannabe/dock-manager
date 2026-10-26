@@ -19,7 +19,6 @@ import * as Docking from './extension.js';
 import * as Utils from './utils.js';
 
 const Labels = Object.freeze({
-    SHOW_MOUNTS: Symbol('show-mounts'),
     FIRST_LAST_CHILD_WORKAROUND: Symbol('first-last-child-workaround'),
 });
 
@@ -183,11 +182,10 @@ export const DockDash = GObject.registerClass({
         });
         this._boxContainer.add_style_class_name(Docking.PositionStyleClass[this._position]);
 
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
         this._box = new St.BoxLayout({
             clip_to_allocation: false,
             ...!this._isHorizontal ? {layout_manager: new DockDashIconsVerticalLayout()} : {},
-            x_align: rtl ? Clutter.ActorAlign.END : Clutter.ActorAlign.START,
+            x_align: Clutter.ActorAlign.START,
             y_align: this._isHorizontal ? Clutter.ActorAlign.CENTER : Clutter.ActorAlign.START,
             y_expand: !this._isHorizontal,
             x_expand: this._isHorizontal,
@@ -409,16 +407,8 @@ export const DockDash = GObject.registerClass({
                 this._dragPlaceholder.child.set_width(this.iconSize / 2);
                 this._dragPlaceholder.child.set_height(this.iconSize);
 
-                let pos = this._dragPlaceholderPos;
-                if (this._isHorizontal &&
-                    Clutter.get_default_text_direction() === Clutter.TextDirection.RTL)
-                    pos = this._box.get_children() - 1 - pos;
-
-                if (pos !== this._dragPlaceholderPos) {
-                    this._dragPlaceholderPos = pos;
-                    this._box.set_child_at_index(this._dragPlaceholder,
-                        this._dragPlaceholderPos);
-                }
+                this._box.set_child_at_index(this._dragPlaceholder,
+                    this._dragPlaceholderPos);
             }
         }
 
@@ -679,14 +669,6 @@ export const DockDash = GObject.registerClass({
         running.forEach(app => {
             if (!(app.get_id() in favorites))
                 newApps.push(app);
-        });
-
-        this._signalsHandler.removeWithLabel(Labels.SHOW_MOUNTS);
-        this._signalsHandler.addWithLabel(Labels.SHOW_MOUNTS,
-            dockManager.removables, 'changed', this._queueRedisplay.bind(this));
-        dockManager.removables.getApps().forEach(removable => {
-            if (!newApps.includes(removable))
-                newApps.push(removable);
         });
 
         // Temporary remove the separator so that we don't compute to position icons
