@@ -31,8 +31,18 @@ export default class DockPreferences extends ExtensionPreferences {
         settings.bind('multi-monitor', monitorRow, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
         group.add(monitorRow);
         group.add(switchRow(settings, 'multi-monitor', __('Show on all monitors')));
-        group.add(switchRow(settings, 'isolate-monitors', __('Isolate monitors'),
-            __('Each dock shows only the applications with windows on its monitor.')));
+
+        // Isolating monitors only makes sense with a dock on each of them.
+        const isolateRow = switchRow(settings, 'isolate-monitors', __('Isolate monitors'),
+            __('Each dock shows only the applications with windows on its monitor.'));
+        settings.bind('multi-monitor', isolateRow, 'sensitive', Gio.SettingsBindFlags.GET);
+        const syncIsolation = () => {
+            if (!settings.get_boolean('multi-monitor') && settings.get_boolean('isolate-monitors'))
+                settings.set_boolean('isolate-monitors', false);
+        };
+        settings.connect('changed::multi-monitor', syncIsolation);
+        syncIsolation();
+        group.add(isolateRow);
         group.add(positionChoice(settings));
         group.add(this._autohideRow(settings));
         return group;
