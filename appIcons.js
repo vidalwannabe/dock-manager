@@ -31,7 +31,6 @@ const {cairo: Cairo} = imports;
 
 const Labels = Object.freeze({
     ISOLATE_MONITORS: Symbol('isolate-monitors'),
-    ISOLATE_WORKSPACES: Symbol('isolate-workspaces'),
     URGENT_WINDOWS: Symbol('urgent-windows'),
 });
 
@@ -141,10 +140,8 @@ export const DockAbstractAppIcon = GObject.registerClass({
             const icon = this.icon._iconBin;
             this._signalsHandler.removeWithLabel(Labels.URGENT_WINDOWS);
             if (this.urgent) {
-                if (Docking.DockManager.settings.danceUrgentApplications) {
-                    icon.set_pivot_point(0.5, 0.5);
-                    this.iconAnimator.addAnimation(icon, 'wiggle');
-                }
+                icon.set_pivot_point(0.5, 0.5);
+                this.iconAnimator.addAnimation(icon, 'wiggle');
                 if (this.running && !this._urgentWindows.size) {
                     const urgentWindows = this.getInterestingWindows();
                     urgentWindows.forEach(w => (w._manualUrgency = true));
@@ -192,13 +189,6 @@ export const DockAbstractAppIcon = GObject.registerClass({
         this._updateRunningState();
         this._updateFocusState();
         this._updateUrgentWindows(interestingWindows);
-
-        if (Docking.DockManager.settings.isolateWorkspaces) {
-            this._signalsHandler.removeWithLabel(Labels.ISOLATE_WORKSPACES);
-            interestingWindows.forEach(window =>
-                this._signalsHandler.addWithLabel(Labels.ISOLATE_WORKSPACES,
-                    window, 'workspace-changed', () => this._updateWindows()));
-        }
     }
 
     _updateRunningState() {
@@ -444,8 +434,7 @@ export const DockAbstractAppIcon = GObject.registerClass({
     _activateAllWindows() {
         // First activate first window so workspace is switched if needed.
         // We don't do this if isolation is on!
-        if (!Docking.DockManager.settings.isolateWorkspaces &&
-            !Docking.DockManager.settings.isolateMonitors) {
+        if (!Docking.DockManager.settings.isolateMonitors) {
             if (!this.running)
                 this.animateLaunch();
             this.app.activate();
@@ -780,17 +769,6 @@ function isWindowUrgent(w) {
  */
 export function getInterestingWindows(windows, monitorIndex) {
     const {settings} = Docking.DockManager;
-
-    // When using workspace isolation, we filter out windows
-    // that are neither in the current workspace nor marked urgent
-    if (settings.isolateWorkspaces) {
-        const showUrgent = settings.workspaceAgnosticUrgentWindows;
-        const activeWorkspace = global.workspace_manager.get_active_workspace();
-        windows = windows.filter(w => {
-            const inWorkspace = w.get_workspace() === activeWorkspace;
-            return inWorkspace || (showUrgent && isWindowUrgent(w));
-        });
-    }
 
     if (settings.isolateMonitors && monitorIndex >= 0) {
         windows = windows.filter(w => {

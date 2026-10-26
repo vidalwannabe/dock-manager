@@ -59,39 +59,10 @@
       <summary>Dock always visible</summary>
       <description>Dock is always visible</description>
     </key>
-    <key type="b" name="icon-size-fixed">
-      <default>false</default>
-      <summary>Fixed icon size</summary>
-      <description>Keep the icon size fixed by scrolling the dock.</description>
-    </key>
-    <key type="b" name="isolate-workspaces">
-      <default>false</default>
-      <summary>Provide workspace isolation</summary>
-      <description>Dash shows only windows from the current workspace, this is applied only if gnome-shell 'current-workspace-only' app-switcher settings is disabled</description>
-    </key>
-    <key type="b" name="workspace-agnostic-urgent-windows">
-      <default>true</default>
-      <summary>Show urgent windows on each workspace</summary>
-      <description>Show or hide urgent windows on each workspace in the dash</description>
-    </key>
     <key type="b" name="isolate-monitors">
       <default>false</default>
       <summary>Provide monitor isolation</summary>
       <description>Dash shows only windows from the monitor</description>
-    </key>
-    <key type="b" name="scroll-to-focused-application">
-      <default>true</default>
-      <summary>Scroll to focused application</summary>
-      <description>Ensure that the focused application icon is always visible in the dash</description>
-    </key>
-    <key type="b" name="dance-urgent-applications">
-      <default>true</default>
-      <summary>Wiggle urgent applications</summary>
-      <description>Wiggle urgent application icons in the dash</description>
-    </key>
-    <key type="d" name="height-fraction">
-      <default>0.90</default>
-      <summary>Dock max height/width (fraction of available space)</summary>
     </key>
     <key type="b" name="extend-height">
       <default>false</default>

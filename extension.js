@@ -1,7 +1,6 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 import Clutter from 'gi://Clutter';
-import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
@@ -29,7 +28,6 @@ const {signals: Signals} = imports;
 
 const Labels = Object.freeze({
     INITIALIZE: Symbol('initialize'),
-    ISOLATION: Symbol('isolation'),
     MAIN_DASH: Symbol('main-dash'),
     OLD_DASH_CHANGES: Symbol('old-dash-changes'),
     SETTINGS: Symbol('settings'),
@@ -41,6 +39,9 @@ const Labels = Object.freeze({
 const DOCK_DWELL_CHECK_INTERVAL = 100;
 const ICON_ANIMATOR_DURATION = 3000;
 const STARTUP_ANIMATION_TIME = 500;
+
+// Share of the screen edge the dock may take, out of panel mode.
+const DOCK_SIZE_FRACTION = 0.9;
 
 export const State = Object.freeze({
     HIDDEN:  0,
@@ -541,15 +542,6 @@ const DockedDash = GObject.registerClass({
         const {settings} = DockManager;
         this._signalsHandler.addWithLabel(Labels.DOCKED_DASH_GLOBAL_SIGNALS, [
             settings,
-            'changed::icon-size-fixed',
-            () => this.dash.updateIconSize(),
-        ], [
-            settings,
-            'changed::dance-urgent-applications',
-            () => this.dash.resetAppIcons(),
-            Utils.SignalsHandlerFlags.CONNECT_AFTER,
-        ], [
-            settings,
             'changed::dock-fixed',
             () => {
                 this._untrackDock();
@@ -581,10 +573,6 @@ const DockedDash = GObject.registerClass({
         [
             settings,
             'changed::extend-height',
-            () => this._resetPosition(),
-        ], [
-            settings,
-            'changed::height-fraction',
             () => this._resetPosition(),
         ], [
             settings,
@@ -973,7 +961,6 @@ const DockedDash = GObject.registerClass({
         super.vfunc_map();
 
         this._bindSettingsChanges();
-        this.dash.updateIconSize();
 
         this._signalsHandler.addWithLabel(Labels.DOCKED_DASH_GLOBAL_SIGNALS, [
             // update when workarea changes, for instance if  other extensions modify the struts
@@ -1005,11 +992,7 @@ const DockedDash = GObject.registerClass({
         // fixed dock.
         const workArea = Main.layoutManager.getWorkAreaForMonitor(this.monitorIndex);
 
-        let fraction = DockManager.settings.heightFraction;
-        if (extendHeight)
-            fraction = 1;
-        else if ((fraction < 0) || (fraction > 1))
-            fraction = 0.95;
+        const fraction = extendHeight ? 1 : DOCK_SIZE_FRACTION;
 
         if (this._isHorizontal) {
             this.width = Math.round(fraction * workArea.width);
@@ -1210,30 +1193,23 @@ const DockedDash = GObject.registerClass({
  * Some bits are around in other methods of other classes.
  * This class just take care of enabling/disabling the option.
  */
-const WorkspaceIsolation = class WorkspaceIsolation {
+const MonitorIsolation = class MonitorIsolation {
     constructor() {
         const {settings} = DockManager;
 
         this._signalsHandler = new Utils.GlobalSignalsHandler();
-        this._injectionsHandler = new Utils.InjectionsHandler();
 
         const updateAllDocks = () => {
             DockManager.allDocks.forEach(dock =>
                 dock.dash.resetAppIcons());
-            if (settings.isolateWorkspaces ||
-                settings.isolateMonitors)
-                this._enable.bind(this)();
+            if (settings.isolateMonitors)
+                this._enable();
             else
-                this._disable.bind(this)();
+                this._disable();
         };
-        this._signalsHandler.add(
-            [settings, 'changed::isolate-workspaces', updateAllDocks],
-            [settings, 'changed::workspace-agnostic-urgent-windows', updateAllDocks],
-            [settings, 'changed::isolate-monitors', updateAllDocks]
-        );
+        this._signalsHandler.add(settings, 'changed::isolate-monitors', updateAllDocks);
 
-        if (settings.isolateWorkspaces ||
-            settings.isolateMonitors)
+        if (settings.isolateMonitors)
             this._enable();
     }
 
@@ -1242,57 +1218,22 @@ const WorkspaceIsolation = class WorkspaceIsolation {
         // although it should never happen
         this._disable();
 
+        // Windows might migrate from one monitor to another without triggering 'restacked'
         DockManager.allDocks.forEach(dock => {
-            global.display.connectObject('restacked',
-                () => dock.dash._queueRedisplay(), dock.dash);
-            global.display.connectObject('window-marked-urgent',
-                () => dock.dash._queueRedisplay(), dock.dash);
-            global.display.connectObject('window-demands-attention',
-                () => dock.dash._queueRedisplay(), dock.dash);
-            global.window_manager.connectObject('switch-workspace',
-                () => dock.dash._queueRedisplay(), dock.dash);
-
-            // This last signal is only needed for monitor isolation, as windows
-            // might migrate from one monitor to another without triggering 'restacked'
-            if (DockManager.settings.isolateMonitors) {
-                global.display.connectObject('window-entered-monitor',
-                    () => dock.dash._queueRedisplay(), dock.dash);
-            }
+            global.display.connectObject(
+                'restacked', () => dock.dash._queueRedisplay(),
+                'window-entered-monitor', () => dock.dash._queueRedisplay(),
+                dock.dash);
         });
-
-        /**
-         * here this is the Shell.App
-         */
-        function IsolatedOverview() {
-            // These lines take care of Nautilus for icons on Desktop
-            const activeWorkspaceIndex =
-                global.workspaceManager.get_active_workspace_index();
-            const windows = this.get_windows().filter(w =>
-                !w.skipTaskbar && w.get_workspace().index() === activeWorkspaceIndex);
-
-            if (windows.length)
-                return Main.activateWindow(windows[0]);
-            return this.open_new_window(-1);
-        }
-
-        this._injectionsHandler.addWithLabel(Labels.ISOLATION,
-            Shell.App.prototype,
-            'activate',
-            IsolatedOverview);
     }
 
     _disable() {
-        DockManager.allDocks.forEach(dock => {
-            global.display.disconnectObject(dock.dash);
-            global.window_manager.disconnectObject(dock.dash);
-        });
-        this._injectionsHandler.removeWithLabel(Labels.ISOLATION);
+        DockManager.allDocks.forEach(dock => global.display.disconnectObject(dock.dash));
     }
 
     destroy() {
         this._disable();
         this._signalsHandler.destroy();
-        this._injectionsHandler.destroy();
     }
 };
 
@@ -1308,7 +1249,6 @@ export class DockManager {
         this._propertyInjections = new Utils.PropertyInjectionsHandler(this);
         this._settings = this._extension.getSettings(
             'org.gnome.shell.extensions.dock-manager');
-        this._appSwitcherSettings = new Gio.Settings({schema_id: 'org.gnome.shell.app-switcher'});
         this._mapSettingsValues();
 
         this._iconTheme = new St.IconTheme();
@@ -1431,34 +1371,6 @@ export class DockManager {
         });
     }
 
-    _mapExternalSetting(settings, key, mappedKey, mapValueFunction, mapUserValueFunction) {
-        const camelMappedKey = mappedKey.replace(/-([a-z\d])/g, k => k[1].toUpperCase());
-
-        const dockPropertyDesc = Object.getOwnPropertyDescriptor(this.settings, camelMappedKey);
-
-        if (!dockPropertyDesc)
-            throw new Error('Setting %s not found in dock'.format(mappedKey));
-
-        mapUserValueFunction ??= value => value;
-        const mappedValue = () => mapValueFunction(settings.get_value(key).recursiveUnpack());
-        const dockUserValue = () =>
-            mapUserValueFunction(this.settings.get_user_value(mappedKey)?.recursiveUnpack());
-        Object.defineProperty(this.settings, camelMappedKey, {
-            get: () => dockUserValue() ?? mappedValue() ?? dockPropertyDesc.value,
-            set: value => {
-                if (mappedValue() === undefined)
-                    dockPropertyDesc.value = value;
-            },
-        });
-
-        this._signalsHandler.addWithLabel(Labels.SETTINGS, settings,
-            'changed::%s'.format(key), () => {
-                this._signalsHandler.blockWithLabel(Labels.SETTINGS);
-                this.settings.emit('changed::%s'.format(mappedKey), mappedKey);
-                this._signalsHandler.unblockWithLabel(Labels.SETTINGS);
-            });
-    }
-
     _mapSettingsValues() {
         this.settings.settingsSchema.list_keys().forEach(key => {
             const camelKey = key.replace(/-([a-z\d])/g, k => k[1].toUpperCase());
@@ -1517,9 +1429,6 @@ export class DockManager {
             'changed::dock-fixed',
             () => this._adjustPanelCorners(),
         ]);
-
-        this._mapExternalSetting(this._appSwitcherSettings, 'current-workspace-only',
-            'isolate-workspaces', value => value || undefined);
     }
 
     _createDocks() {
@@ -1583,7 +1492,7 @@ export class DockManager {
 
         // Load optional features. We load *after* the docks are created, since
         // we need to connect the signals to all dock instances.
-        this._workspaceIsolation = new WorkspaceIsolation();
+        this._monitorIsolation = new MonitorIsolation();
 
         this.emit('docks-ready');
     }
@@ -2032,7 +1941,7 @@ export class DockManager {
 
     _deleteDocks() {
         // Remove extra features
-        this._workspaceIsolation?.destroy();
+        this._monitorIsolation?.destroy();
 
         // Delete all docks
         [...this._allDocks].forEach(d => d.destroy());
@@ -2124,7 +2033,6 @@ export class DockManager {
         this._removables = null;
         this._iconTheme = null;
         this._settings = null;
-        this._appSwitcherSettings = null;
         this._windowTracker = null;
         this._oldDash = null;
 

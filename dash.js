@@ -90,8 +90,9 @@ const DockDashIconsVerticalLayout = GObject.registerClass(
         }
     });
 
-// GNOME's dash icon sizes; the largest one is the size the dock's icons have when they fit.
-const baseIconSizes = [16, 22, 24, 32, 48, 64];
+// GNOME's largest dash icon size. Icons never shrink: the ones that don't fit are reached by
+// scrolling.
+const ICON_SIZE = 64;
 
 /**
  * This class is a fork of the upstream dash class (ui.dash.js)
@@ -139,10 +140,9 @@ export const DockDash = GObject.registerClass({
 
         this._maxWidth = -1;
         this._maxHeight = -1;
-        this.iconSize = baseIconSizes.at(-1);
-        this._availableIconSizes = baseIconSizes;
+        this.iconSize = ICON_SIZE;
+        this._availableIconSizes = [ICON_SIZE];
         this._shownInitially = false;
-        this._initializeIconSize();
         this._signalsHandler = new Utils.GlobalSignalsHandler(this);
 
         this._separator = null;
@@ -460,10 +460,6 @@ export const DockDash = GObject.registerClass({
     }
 
     _onScrollEvent(actor, event) {
-        // If scroll is not used because the icon is resized, let the scroll event propagate.
-        if (!Docking.DockManager.settings.iconSizeFixed)
-            return Clutter.EVENT_PROPAGATE;
-
         // reset timeout to avid conflicts with the mousehover event
         this._ensureItemVisibility(null);
 
@@ -552,12 +548,6 @@ export const DockDash = GObject.registerClass({
                 appIcon._menu._boxPointer.xOffset = -xShift;
                 appIcon._menu._boxPointer.yOffset = -yShift;
             }
-        }, this);
-
-        appIcon.connectObject('notify::focused', () => {
-            const {settings} = Docking.DockManager;
-            if (appIcon.focused && settings.scrollToFocusedApplication)
-                ensureActorVisibleInScrollView(this._scrollView, item);
         }, this);
 
         appIcon.connectObject('notify::urgent', () => {
@@ -787,10 +777,9 @@ export const DockDash = GObject.registerClass({
             }
         }
 
-        if (settings.isolateWorkspaces ||
-            settings.isolateMonitors) {
+        if (settings.isolateMonitors) {
             // When using isolation, we filter out apps that have no windows in
-            // the current workspace
+            // the dock's monitor
             const monitorIndex = this._monitorIndex;
             running = running.filter(app =>
                 AppIcons.getInterestingWindows(app.get_windows(), monitorIndex).length);
@@ -973,17 +962,6 @@ export const DockDash = GObject.registerClass({
         addedItems.forEach(({item}) => item.show(animate));
 
         this.updateShowAppsButton();
-    }
-
-    // A fixed icon size keeps only the largest size, so the icons never shrink to fit.
-    _initializeIconSize() {
-        this._availableIconSizes = Docking.DockManager.settings.iconSizeFixed
-            ? [baseIconSizes.at(-1)] : baseIconSizes;
-    }
-
-    updateIconSize() {
-        this._initializeIconSize();
-        this._queueRedisplay();
     }
 
     /**
