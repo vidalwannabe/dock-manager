@@ -38,7 +38,7 @@ const Labels = Object.freeze({
 const DOCK_DWELL_CHECK_INTERVAL = 100;
 const STARTUP_ANIMATION_TIME = 500;
 
-// Share of the screen edge the dock may take, out of panel mode.
+// Share of the screen edge the dock may take, when it is not extended.
 const DOCK_SIZE_FRACTION = 0.9;
 
 export const State = Object.freeze({

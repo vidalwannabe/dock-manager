@@ -76,14 +76,13 @@ export default class DockPreferences extends ExtensionPreferences {
 
     _appearanceGroup(settings) {
         const group = new Adw.PreferencesGroup({title: __('Appearance')});
-        group.add(switchRow(settings, 'force-straight-corner', __('Force straight corner')));
-        group.add(switchRow(settings, 'transparent-background', __('Transparent background')));
-        group.add(switchRow(settings, 'extend-height', __('Panel mode: extend to the screen edge')));
-        const centerIcons = switchRow(settings, 'always-center-icons', __('Place icons to the center'));
+        group.add(switchRow(settings, 'extend-height', __('Extended dock')));
+        const centerIcons = switchRow(settings, 'always-center-icons', __('Centralize icons'));
         settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
         group.add(centerIcons);
-
-        group.add(switchRow(settings, 'running-indicator-dominant-color', __('Use dominant color for the running dots')));
+        group.add(switchRow(settings, 'force-straight-corner', __('Straight corners')));
+        group.add(switchRow(settings, 'transparent-background', __('Transparent background')));
+        group.add(switchRow(settings, 'running-indicator-dominant-color', __('Colored indicator dots')));
         return group;
     }
 }
