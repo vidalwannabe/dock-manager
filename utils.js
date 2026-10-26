@@ -10,7 +10,7 @@ import St from 'gi://St';
 
 import * as Docking from './extension.js';
 
-// Dash to dock supports replacing vfuncs in GObject classes and we need
+// The dock supports replacing vfuncs in GObject classes and we need
 // this to monkey them.
 const {_gi: Gi} = imports;
 
@@ -25,7 +25,7 @@ const GENERIC_KEY = Symbol('generic');
  * Simplify global signals and function injections handling
  * abstract class
  */
-const BasicHandler = class DashToDockBasicHandler {
+const BasicHandler = class BasicHandler {
     static get genericKey() {
         return GENERIC_KEY;
     }

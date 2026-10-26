@@ -160,7 +160,7 @@ export const DockDash = GObject.registerClass({
         this._labelShowing = false;
 
         this._dashContainer = new St.BoxLayout({
-            name: 'dashtodockDashContainer',
+            name: 'dockManagerDashContainer',
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
             y_expand: this._isHorizontal,
@@ -168,7 +168,7 @@ export const DockDash = GObject.registerClass({
         });
 
         this._scrollView = new St.ScrollView({
-            name: 'dashtodockDashScrollview',
+            name: 'dockManagerDashScrollview',
             hscrollbar_policy: this._isHorizontal ? St.PolicyType.EXTERNAL : St.PolicyType.NEVER,
             vscrollbar_policy: this._isHorizontal ?  St.PolicyType.NEVER : St.PolicyType.EXTERNAL,
             x_expand: this._isHorizontal,
@@ -179,7 +179,7 @@ export const DockDash = GObject.registerClass({
         this._scrollView.connect('scroll-event', this._onScrollEvent.bind(this));
 
         this._boxContainer = new St.BoxLayout({
-            name: 'dashtodockBoxContainer',
+            name: 'dockManagerBoxContainer',
             x_align: Clutter.ActorAlign.FILL,
             y_align: Clutter.ActorAlign.FILL,
         });

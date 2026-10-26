@@ -1,46 +1,68 @@
-# Dash to Dock (Dock Manager fork)
+# Dock Manager
 
-Personal fork of [Dash to Dock](https://github.com/ubuntu/dash-to-dock) v110. Its only change: `stylesheet.css` keeps the dock's layout (margins, padding, sizes, spacing) and has no colors, backgrounds, corners or transparencies, so the dock shows GNOME's own style and any extension that recolors the shell recolors it too.
+GNOME Shell extension (GNOME 48) that moves the dash out of the overview into a dock on the desktop. A personal fork of [Dash to Dock](https://github.com/ubuntu/dash-to-dock) v110, cut down to the features I use and with no colors of its own: the dock shows GNOME's own style, and any extension that recolors the shell (such as [Shell Color Manager](https://github.com/vidalwannabe/shell-color-manager)) recolors it too.
 
-## A dock for the GNOME Shell
-This extension enhances the dash moving it out of the overview and transforming it in a dock for an easier launching of applications and a faster switching between windows and desktops without having to leave the desktop view.
+## Features
 
-[<img src="https://micheleg.github.io/dash-to-dock/media/get-it-on-ego.png" height="100">](https://extensions.gnome.org/extension/307/dash-to-dock)
+**Position and size**
 
-For additional installation instructions and more information visit [https://micheleg.github.io/dash-to-dock/](https://micheleg.github.io/dash-to-dock/).
+| Option | What it does |
+| --- | --- |
+| Show the dock on / Show on all monitors | The monitor the dock is on, or one dock per monitor |
+| Position on screen | Left, bottom, top or right |
+| Intelligent autohide | On unless the dock is fixed. The dock hides when a window of the focused application touches it. With Autohide on, it shows when the pointer rests on the screen edge, also in fullscreen and for urgent windows if enabled, with its own animation, show and hide timeouts |
+| Dock size limit | The dock's length, as a share of the screen edge |
+| Fixed icon size | Icons stay at 64 px, GNOME's own size, and the ones that don't fit are reached by scrolling over the dock. Off, icons shrink to fit |
 
-## Installation from source
+**Launchers**
 
-The extension can be installed directly from source, either for the convenience of using git or to test the latest development version. Clone the desired branch with git
+| Option | What it does |
+| --- | --- |
+| Isolate workspaces | Only the applications of the current workspace. Follows GNOME Multitasking's Application Switching setting until it is set here |
+| Show urgent windows despite current workspace | Urgent windows of other workspaces still show |
+| Isolate monitors | Only the applications of the dock's monitor |
+| Keep the focused application always visible | Scrolls the dock to the focused application |
+| Wiggle urgent applications | Urgent applications wiggle |
 
-### Build Dependencies
+Pinned and running applications are always shown, and mounted volumes appear in the dock too.
 
-`glib-compile-schemas` and `gettext`. No SASS: this fork keeps a plain `stylesheet.css` with only the dock's layout, so it has no colors of its own (see the top of this file).
+**Appearance**
 
-### Building
+| Option | What it does |
+| --- | --- |
+| Force straight corner | No rounded corners |
+| Transparent background | The dock without its background |
+| Panel mode | The dock spans the whole screen edge, with its icons optionally centered |
+| Use dominant color for the running dots | One dot per window (up to four), in the icon's dominant color instead of the dot's |
 
-Clone the repository or download the branch from github. A simple Makefile is included.
+**Icons**
 
-Next use `make` to install the extension into your home directory. A Shell reload is required <kbd>Alt</kbd> + <kbd>F2</kbd> <kbd>r</kbd> <kbd>Enter</kbd> under Xorg or under Wayland you may have to logout and login. The extension has to be enabled  with *gnome-extensions-app* (GNOME Extensions) or with *dconf*.
+Click focuses an application, or minimizes it when it is focused already; Shift+click minimizes all its windows; middle click opens a new window. The right-click menu lists the open windows, the application's actions, pin and quit.
+
+## Files
+
+| File | Contents |
+| --- | --- |
+| `extension.js` | The dock: docking, intellihide, theming and the extension entry point |
+| `dash.js` | The row of icons inside the dock |
+| `appIcons.js` | Each icon, its menu and the running dots |
+| `locations.js` | Mounted volumes and the file manager's windows |
+| `utils.js` | Helpers shared by every file |
+| `prefs.js` | The preferences window |
+| `stylesheet.css` | The dock's layout |
+| `schemas/` | The settings |
+
+## Installation
+
+Clone the repository into `~/.local/share/gnome-shell/extensions/dock-manager@vidalwannabe.github.io`, compile the settings and log out and back in:
 
 ```bash
-git clone https://github.com/micheleg/dash-to-dock.git
-make -C dash-to-dock install
+git clone https://github.com/vidalwannabe/dock-manager.git ~/.local/share/gnome-shell/extensions/dock-manager@vidalwannabe.github.io
+glib-compile-schemas ~/.local/share/gnome-shell/extensions/dock-manager@vidalwannabe.github.io/schemas
 ```
 
-If `msgfmt` is not available on your system, you will see an error message like the following:
-
-```bash
-make: msgfmt: No such file or directory
-```
-
-In this case install the `gettext` package from your distribution's repository.
-
-
-## Bug Reporting
-
-Bugs should be reported to the Github bug tracker [https://github.com/micheleg/dash-to-dock/issues](https://github.com/micheleg/dash-to-dock/issues).
+Then enable it with GNOME Extensions or `gnome-extensions enable dock-manager@vidalwannabe.github.io`. Disable Dash to Dock or Ubuntu Dock first.
 
 ## License
-Dash to Dock Gnome Shell extension is distributed under the terms of the GNU General Public License,
-version 2 or later. See the COPYING file for details.
+
+Distributed under the terms of the GNU General Public License, version 2 or later, like Dash to Dock. See the COPYING file for details.

@@ -55,7 +55,7 @@ const WorkspaceLayout = Object.freeze({
 
     // Maximum share of the available width the current workspace may take in
     // the window picker. Stock GNOME ends up around this ratio by reserving the
-    // bottom dash space, which dash-to-dock removes.
+    // bottom dash space, which the dock removes.
     MAX_WIDTH_RATIO: 0.80,
 
     // Minimum width share the current workspace keeps on narrow work areas.
@@ -220,14 +220,14 @@ const DockedDash = GObject.registerClass({
         'showing': {},
         'hiding': {},
     },
-}, class DashToDock extends St.Bin {
+}, class DockedDash extends St.Bin {
     _init(params) {
         this._position = Utils.getPosition();
 
         // This is the centering actor
         super._init({
             ...params,
-            name: 'dashtodockContainer',
+            name: 'dockManagerContainer',
             reactive: false,
             style_class: PositionStyleClass[this._position],
         });
@@ -280,7 +280,7 @@ const DockedDash = GObject.registerClass({
 
         // This is the actor whose hover status us tracked for autohide
         this._box = new St.BoxLayout({
-            name: 'dashtodockBox',
+            name: 'dockManagerBox',
             reactive: true,
             track_hover: true,
         });
@@ -853,7 +853,7 @@ const DockedDash = GObject.registerClass({
                     DockManager.settings.showDelay * 1000,
                     this._dockDwellTimeout.bind(this));
                 GLib.Source.set_name_by_id(this._dockDwellTimeoutId,
-                    '[dash-to-dock] this._dockDwellTimeout');
+                    '[dock-manager] this._dockDwellTimeout');
             }
             this._dockDwelling = true;
         } else {
@@ -1210,7 +1210,7 @@ const DockedDash = GObject.registerClass({
  * Some bits are around in other methods of other classes.
  * This class just take care of enabling/disabling the option.
  */
-const WorkspaceIsolation = class DashToDockWorkspaceIsolation {
+const WorkspaceIsolation = class WorkspaceIsolation {
     constructor() {
         const {settings} = DockManager;
 
@@ -1299,7 +1299,7 @@ const WorkspaceIsolation = class DashToDockWorkspaceIsolation {
 export class DockManager {
     constructor(extension) {
         if (DockManager._singleton)
-            throw new Error('DashToDock has been already initialized');
+            throw new Error('DockManager has been already initialized');
         DockManager._singleton = this;
         this._extension = extension;
         this._signalsHandler = new Utils.GlobalSignalsHandler(this);
@@ -1307,7 +1307,7 @@ export class DockManager {
         this._vfuncInjections = new Utils.VFuncInjectionsHandler(this);
         this._propertyInjections = new Utils.PropertyInjectionsHandler(this);
         this._settings = this._extension.getSettings(
-            'org.gnome.shell.extensions.dash-to-dock');
+            'org.gnome.shell.extensions.dock-manager');
         this._appSwitcherSettings = new Gio.Settings({schema_id: 'org.gnome.shell.app-switcher'});
         this._mapSettingsValues();
 
@@ -2722,7 +2722,7 @@ Signals.addSignalMethods(ThemeManager.prototype);
 // We export this so it can be accessed by other extensions
 export let dockManager;
 
-export default class DashToDockExtension extends Extension.Extension {
+export default class DockManagerExtension extends Extension.Extension {
     enable() {
         // TODO: Remove this when upstream will disable extensions on shutdown
         // See: https://gitlab.gnome.org/GNOME/gnome-shell/-/merge_requests/4214

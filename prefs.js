@@ -19,7 +19,7 @@ const SCALE_UPDATE_TIMEOUT = 500;
 // Appearance tabs.
 export default class DockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
-        const settings = this.getSettings('org.gnome.shell.extensions.dash-to-dock');
+        const settings = this.getSettings('org.gnome.shell.extensions.dock-manager');
         window.set_default_size(600, 850);
 
         // Pending slider saves are dropped when the window closes.
