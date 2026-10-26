@@ -14,7 +14,7 @@ import {
 export default class DockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('org.gnome.shell.extensions.dock-manager');
-        window.set_default_size(600, 850);
+        window.set_default_size(600, 760);
 
         const page = new Adw.PreferencesPage();
         page.add(this._positionGroup(settings));
