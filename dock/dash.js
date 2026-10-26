@@ -14,9 +14,13 @@ import * as Dash from 'resource:///org/gnome/shell/ui/dash.js';
 import * as DND from 'resource:///org/gnome/shell/ui/dnd.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import * as AppIcons from './appIcons.js';
-import * as Docking from './extension.js';
-import * as Handlers from './handlers.js';
+import {GlobalSignalsHandler, PropertyInjectionsHandler} from '../handlers.js';
+import {getInterestingWindows, itemShowLabel, makeAppIcon} from '../icons/appIcon.js';
+import {DockShowAppsIcon} from '../icons/showAppsIcon.js';
+import {DockManager} from './manager.js';
+import {PositionStyleClass} from './theme.js';
+
+const {signals: Signals} = imports;
 
 const Labels = Object.freeze({
     FIRST_LAST_CHILD_WORKAROUND: Symbol('first-last-child-workaround'),
@@ -44,11 +48,11 @@ class DockDashItemContainer extends Dash.DashItemContainer {
         else
             this.yExpand = false;
 
-        this.label?.add_style_class_name(Docking.PositionStyleClass[position]);
+        this.label?.add_style_class_name(PositionStyleClass[position]);
     }
 
     showLabel() {
-        return AppIcons.itemShowLabel.call(this);
+        return itemShowLabel.call(this);
     }
 
     // we override the method show taken from:
@@ -140,12 +144,12 @@ export const DockDash = GObject.registerClass({
         this._maxHeight = -1;
         this.iconSize = ICON_SIZE;
         this._shownInitially = false;
-        this._signalsHandler = new Handlers.GlobalSignalsHandler(this);
+        this._signalsHandler = new GlobalSignalsHandler(this);
 
         this._separator = null;
 
         this._monitorIndex = monitorIndex;
-        this._position = Docking.DockManager.settings.dockPosition;
+        this._position = DockManager.settings.dockPosition;
         this._isHorizontal = (this._position === St.Side.TOP) ||
                                (this._position === St.Side.BOTTOM);
 
@@ -180,7 +184,7 @@ export const DockDash = GObject.registerClass({
             x_align: Clutter.ActorAlign.FILL,
             y_align: Clutter.ActorAlign.FILL,
         });
-        this._boxContainer.add_style_class_name(Docking.PositionStyleClass[this._position]);
+        this._boxContainer.add_style_class_name(PositionStyleClass[this._position]);
 
         this._box = new St.BoxLayout({
             clip_to_allocation: false,
@@ -208,7 +212,7 @@ export const DockDash = GObject.registerClass({
         this._scrollView.add_child(this._boxContainer);
         this._dashContainer.add_child(this._scrollView);
 
-        this._showAppsIcon = new AppIcons.DockShowAppsIcon(this._position);
+        this._showAppsIcon = new DockShowAppsIcon(this._position);
         this._showAppsIcon.show(false);
         this._showAppsIcon.icon.setIconSize(this.iconSize);
         this._showAppsIcon.x_expand = false;
@@ -386,7 +390,7 @@ export const DockDash = GObject.registerClass({
             if (ret === DND.DragMotionResult.CONTINUE)
                 return ret;
         } else {
-            const propertyInjections = new Handlers.PropertyInjectionsHandler();
+            const propertyInjections = new PropertyInjectionsHandler();
             propertyInjections.add(this._box, 'width', {
                 get: () => this._box.get_children().reduce((a, c) => a + c.height, 0),
             });
@@ -500,7 +504,7 @@ export const DockDash = GObject.registerClass({
     }
 
     _createAppItem(app) {
-        const appIcon = new AppIcons.makeAppIcon(app, this._monitorIndex);
+        const appIcon = makeAppIcon(app, this._monitorIndex);
 
         if (appIcon._draggable) {
             appIcon._draggable.connect('drag-begin', () => {
@@ -537,7 +541,7 @@ export const DockDash = GObject.registerClass({
         appIcon.connectObject('notify::urgent', () => {
             if (appIcon.urgent) {
                 ensureActorVisibleInScrollView(this._scrollView, item);
-                if (Docking.DockManager.settings.showDockUrgentNotify)
+                if (DockManager.settings.showDockUrgentNotify)
                     this._requireVisibility();
             }
         }, this);
@@ -615,7 +619,7 @@ export const DockDash = GObject.registerClass({
         const favorites = AppFavorites.getAppFavorites().getFavoriteMap();
 
         let running = this._appSystem.get_running();
-        const dockManager = Docking.DockManager.getDefault();
+        const dockManager = DockManager.getDefault();
         const {settings} = dockManager;
 
         this._scrollView.set({
@@ -637,7 +641,7 @@ export const DockDash = GObject.registerClass({
             // the dock's monitor
             const monitorIndex = this._monitorIndex;
             running = running.filter(app =>
-                AppIcons.getInterestingWindows(app.get_windows(), monitorIndex).length);
+                getInterestingWindows(app.get_windows(), monitorIndex).length);
         }
 
         const children = this._box.get_children().filter(actor => {
@@ -866,7 +870,7 @@ export const DockDash = GObject.registerClass({
         if (this._showAppsIcon.get_parent() && !this._showAppsIcon.visible)
             return;
 
-        const {settings} = Docking.DockManager;
+        const {settings} = DockManager;
         const notifiedProperties = [];
         const showAppsContainer = settings.dockExtended ? this._boxContainer : this._dashContainer;
         const needsFirstLastChildWorkaround = Config.PACKAGE_VERSION.split('.')[0] < 49;

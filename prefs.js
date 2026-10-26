@@ -5,10 +5,7 @@ import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 
-import {
-    ExtensionPreferences,
-    gettext as __,
-} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 // One page with every setting: Position, then Appearance.
 export default class DockPreferences extends ExtensionPreferences {
@@ -25,16 +22,16 @@ export default class DockPreferences extends ExtensionPreferences {
     // ---------- Position ----------
 
     _positionGroup(settings) {
-        const group = new Adw.PreferencesGroup({title: __('Position')});
+        const group = new Adw.PreferencesGroup({title: 'Position'});
 
         const monitorRow = monitorChoice(settings);
         settings.bind('multi-monitor', monitorRow, 'sensitive', Gio.SettingsBindFlags.INVERT_BOOLEAN);
         group.add(monitorRow);
-        group.add(switchRow(settings, 'multi-monitor', __('Show on all monitors')));
+        group.add(switchRow(settings, 'multi-monitor', 'Show on all monitors'));
 
         // Isolating monitors only makes sense with a dock on each of them.
-        const isolateRow = switchRow(settings, 'isolate-monitors', __('Isolate monitors'),
-            __('Each dock shows only the applications with windows on its monitor.'));
+        const isolateRow = switchRow(settings, 'isolate-monitors', 'Isolate monitors',
+            'Each dock shows only the applications with windows on its monitor.');
         settings.bind('multi-monitor', isolateRow, 'sensitive', Gio.SettingsBindFlags.GET);
         const syncIsolation = () => {
             if (!settings.get_boolean('multi-monitor') && settings.get_boolean('isolate-monitors'))
@@ -51,23 +48,23 @@ export default class DockPreferences extends ExtensionPreferences {
     // Intelligent autohide: on unless the dock is fixed, with its options inside.
     _autohideRow(settings) {
         const row = new Adw.ExpanderRow({
-            title: __('Intelligent autohide'),
-            subtitle: __('Hide the dock when it obstructs a window of the current application. More refined settings are available.'),
+            title: 'Intelligent autohide',
+            subtitle: 'Hide the dock when it obstructs a window of the current application. More refined settings are available.',
             show_enable_switch: true,
         });
         settings.bind('dock-fixed', row, 'enable-expansion', Gio.SettingsBindFlags.INVERT_BOOLEAN);
 
-        const autohide = switchRow(settings, 'autohide', __('Show on mouse hover'));
-        const fullscreen = switchRow(settings, 'autohide-in-fullscreen', __('Enable in fullscreen mode'));
-        const urgent = switchRow(settings, 'show-dock-urgent-notify', __('Show dock for urgent notifications'));
+        const autohide = switchRow(settings, 'autohide', 'Show on mouse hover');
+        const fullscreen = switchRow(settings, 'autohide-in-fullscreen', 'Enable in fullscreen mode');
+        const urgent = switchRow(settings, 'show-dock-urgent-notify', 'Show dock for urgent notifications');
         for (const option of [fullscreen, urgent])
             settings.bind('autohide', option, 'sensitive', Gio.SettingsBindFlags.GET);
 
-        const animation = spinRow(settings, 'animation-time', __('Animation duration (s)'), 0, 1, 0.05, 2);
-        const hideTimeout = spinRow(settings, 'hide-delay', __('Hide timeout (s)'), 0, 1, 0.05, 2);
-        const showTimeout = spinRow(settings, 'show-delay', __('Show timeout (s)'), 0, 1, 0.05, 2);
+        const animation = spinRow(settings, 'animation-time', 'Animation duration (s)', 0, 1, 0.05, 2);
+        const hideTimeout = spinRow(settings, 'hide-delay', 'Hide timeout (s)', 0, 1, 0.05, 2);
+        const showTimeout = spinRow(settings, 'show-delay', 'Show timeout (s)', 0, 1, 0.05, 2);
 
-        const reset = new Gtk.Button({label: __('Reset to defaults'), valign: Gtk.Align.CENTER});
+        const reset = new Gtk.Button({label: 'Reset to defaults', valign: Gtk.Align.CENTER});
         reset.connect('clicked', () => {
             for (const key of ['autohide', 'autohide-in-fullscreen', 'show-dock-urgent-notify',
                 'animation-time', 'show-delay', 'hide-delay'])
@@ -84,14 +81,14 @@ export default class DockPreferences extends ExtensionPreferences {
     // ---------- Appearance ----------
 
     _appearanceGroup(settings) {
-        const group = new Adw.PreferencesGroup({title: __('Appearance')});
-        group.add(switchRow(settings, 'extend-height', __('Extended dock')));
-        const centerIcons = switchRow(settings, 'always-center-icons', __('Centralize icons'));
+        const group = new Adw.PreferencesGroup({title: 'Appearance'});
+        group.add(switchRow(settings, 'extend-height', 'Extended dock'));
+        const centerIcons = switchRow(settings, 'always-center-icons', 'Centralize icons');
         settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
         group.add(centerIcons);
-        group.add(switchRow(settings, 'force-straight-corner', __('Straight corners')));
-        group.add(switchRow(settings, 'transparent-background', __('Transparent background')));
-        group.add(switchRow(settings, 'running-indicator-dominant-color', __('Colored indicator dots')));
+        group.add(switchRow(settings, 'force-straight-corner', 'Straight corners'));
+        group.add(switchRow(settings, 'transparent-background', 'Transparent background'));
+        group.add(switchRow(settings, 'running-indicator-dominant-color', 'Colored indicator dots'));
         return group;
     }
 }
@@ -115,13 +112,13 @@ function spinRow(settings, key, title, lower, upper, step, digits) {
 // Position on screen. The setting keeps the order Top, Right, Bottom, Left.
 function positionChoice(settings) {
     const positions = [
-        [3, __('Left')],
-        [2, __('Bottom')],
-        [0, __('Top')],
-        [1, __('Right')],
+        [3, 'Left'],
+        [2, 'Bottom'],
+        [0, 'Top'],
+        [1, 'Right'],
     ];
     const row = new Adw.ComboRow({
-        title: __('Position on screen'),
+        title: 'Position on screen',
         model: Gtk.StringList.new(positions.map(([, label]) => label)),
     });
     const show = () => {
@@ -142,7 +139,7 @@ function positionChoice(settings) {
 // "Show the dock on": the connected monitors, by their connector.
 function monitorChoice(settings) {
     const names = new Gtk.StringList();
-    const row = new Adw.ComboRow({title: __('Show the dock on'), model: names});
+    const row = new Adw.ComboRow({title: 'Show the dock on', model: names});
     const monitorsConfig = new MonitorsConfig();
     let monitors = [];
     let showing = false;
@@ -153,10 +150,8 @@ function monitorChoice(settings) {
         monitors = monitorsConfig.monitors.filter(m => m.active || m.index === preferred);
         showing = true;
         names.splice(0, names.get_n_items(), monitors.map(m => m.isPrimary
-            /* TRANSLATORS: This will be followed by Display Name - Connector. */
-            ? `${__('Primary monitor: ') + m.displayName} - ${m.connector}`
-            /* TRANSLATORS: Followed by monitor index, Display Name - Connector. */
-            : `${__('Secondary monitor ') + (m.index + 1)} - ${m.displayName} - ${m.connector}`));
+            ? `${'Primary monitor: ' + m.displayName} - ${m.connector}`
+            : `${'Secondary monitor ' + (m.index + 1)} - ${m.displayName} - ${m.connector}`));
         let selected = monitors.findIndex(m => m.index === preferred ||
             (preferred === -2 && preferredConnector === m.connector));
         if (selected < 0)

@@ -27,15 +27,25 @@ Pinned and running applications of every workspace are always shown. Unless exte
 
 **Icons**
 
-Click focuses an application, or minimizes it when it is focused already; Shift+click minimizes all its windows; middle click opens a new window. The right-click menu lists the open windows, the application's actions, pin and quit.
+The focused application's tile stands out from the others, in the shade the theme gives a checked tile. Click focuses an application, or minimizes it when it is focused already; Shift+click minimizes all its windows; middle click opens a new window. The right-click menu lists the open windows, the application's actions, pin and quit.
 
 ## Files
 
 | File | Contents |
 | --- | --- |
-| `extension.js` | The dock: docking, intellihide, theming and the extension entry point |
-| `dash.js` | The row of icons inside the dock |
-| `appIcons.js` | Each icon, its menu and the running dots |
+| `extension.js` | The extension's entry point: creates the dock manager |
+| `dock/manager.js` | Reads the settings and creates a dock on each monitor |
+| `dock/dockedDash.js` | A dock: its place on the screen, showing and hiding |
+| `dock/intellihide.js` | Hides the dock when the focused application's windows touch it |
+| `dock/monitorIsolation.js` | Isolate monitors |
+| `dock/overview.js` | Fits GNOME's overview to the dock, in place of GNOME's own dash |
+| `dock/theme.js` | The dock's style classes |
+| `dock/dash.js` | The row of icons inside a dock: which apps, their order, dragging and scrolling |
+| `icons/appIcon.js` | An application's icon: clicks, states, the focused highlight and its label |
+| `icons/appIconMenu.js` | The icon's right-click menu |
+| `icons/showAppsIcon.js` | The Show Apps button and its menu |
+| `icons/runningDots.js` | The dots of a running application |
+| `icons/dominantColor.js` | The dominant color of an icon, for the colored dots |
 | `handlers.js` | Connecting signals and replacing GNOME's methods, undone when the dock is disabled |
 | `prefs.js` | The preferences window |
 | `stylesheet.css` | The dock's layout |

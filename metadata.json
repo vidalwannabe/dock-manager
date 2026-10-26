@@ -1,10 +1,9 @@
 {
   "uuid": "dock-manager@vidalwannabe.github.io",
   "name": "Dock Manager",
-  "description": "Moves the dash out of the overview into a dock on the desktop, with intelligent autohide, panel mode and running dots. A personal fork of Dash to Dock v110 that keeps GNOME's own style.",
+  "description": "Moves the dash out of the overview into a dock on the desktop, with intelligent autohide, an extended mode, running dots and the focused app highlighted. A personal fork of Dash to Dock v110 that keeps GNOME's own style.",
   "url": "https://github.com/vidalwannabe/dock-manager",
   "settings-schema": "org.gnome.shell.extensions.dock-manager",
-  "gettext-domain": "dock-manager",
   "shell-version": [
     "48"
   ],
