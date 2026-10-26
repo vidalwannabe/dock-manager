@@ -47,8 +47,7 @@ export default class DockPreferences extends ExtensionPreferences {
         });
         settings.bind('dock-fixed', row, 'enable-expansion', Gio.SettingsBindFlags.INVERT_BOOLEAN);
 
-        const autohide = switchRow(settings, 'autohide', __('Autohide'),
-            __('Show the dock by mouse hover on the screen edge.'));
+        const autohide = switchRow(settings, 'autohide', __('Show on mouse hover'));
         const fullscreen = switchRow(settings, 'autohide-in-fullscreen', __('Enable in fullscreen mode'));
         const urgent = switchRow(settings, 'show-dock-urgent-notify', __('Show dock for urgent notifications'));
         for (const option of [fullscreen, urgent])
