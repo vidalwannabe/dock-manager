@@ -79,7 +79,11 @@ export const DockAbstractAppIcon = GObject.registerClass({
         }
 
         this._signalsHandler.add(this.app, 'windows-changed', () => this._updateWindows());
-        this._signalsHandler.add(this.app, 'notify::state', () => this._updateRunningState());
+        // An app gets the focus while still starting: once it runs, its focus is checked again.
+        this._signalsHandler.add(this.app, 'notify::state', () => {
+            this._updateRunningState();
+            this._updateFocusState();
+        });
         this._signalsHandler.add(global.display, 'window-demands-attention', (_dpy, window) =>
             this._onWindowDemandsAttention(window));
         this._signalsHandler.add(global.display, 'window-marked-urgent', (_dpy, window) =>
