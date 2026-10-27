@@ -79,6 +79,10 @@ export class Intellihide {
             global.backend.get_monitor_manager(),
             'monitors-changed',
             this._checkOverlap.bind(this),
+        ], [
+            DockManager.settings,
+            'changed::intellihide-all-windows',
+            this._checkOverlap.bind(this),
         ]);
     }
 
@@ -235,7 +239,7 @@ export class Intellihide {
 
     // Filter interesting windows to be considered for intellihide.
     // Consider all windows visible on the current workspace.
-    // Optionally skip windows of other applications
+    // Unless every window is dodged, skip windows of other applications
     _intellihideFilterInteresting(wa) {
         const metaWin = wa.get_meta_window();
         const currentWorkspace = global.workspace_manager.get_active_workspace_index();
@@ -243,7 +247,7 @@ export class Intellihide {
         const workspaceIndex = workspace.index();
 
         // Skip windows of other apps
-        if (this._focusApp) {
+        if (this._focusApp && !DockManager.settings.intellihideAllWindows) {
             const {windowTracker} = DockManager;
             const currentApp = windowTracker.get_window_app(metaWin);
             const focusWindow = global.display.get_focus_window();

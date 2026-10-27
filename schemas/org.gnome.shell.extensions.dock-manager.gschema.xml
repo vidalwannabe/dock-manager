@@ -45,6 +45,11 @@
       <summary>Dock shown on mouse over</summary>
       <description>Enable or disable autohide mode</description>
     </key>
+    <key type="b" name="intellihide-all-windows">
+      <default>false</default>
+      <summary>Dodge every window</summary>
+      <description>Hide the dock when any window covers it, not only the windows of the focused application.</description>
+    </key>
     <key type="b" name="autohide-in-fullscreen">
       <default>false</default>
       <summary>Enable autohide in fullscreen mode.</summary>

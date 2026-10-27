@@ -55,6 +55,8 @@ export default class DockPreferences extends ExtensionPreferences {
         });
         settings.bind('dock-fixed', row, 'enable-expansion', Gio.SettingsBindFlags.INVERT_BOOLEAN);
 
+        const allWindows = switchRow(settings, 'intellihide-all-windows', 'Hide for every window',
+            'Hide the dock when any window covers it, not only the focused application.');
         const autohide = switchRow(settings, 'autohide', 'Show on mouse hover');
         const fullscreen = switchRow(settings, 'autohide-in-fullscreen', 'Enable in fullscreen mode');
         const urgent = switchRow(settings, 'show-dock-urgent-notify', 'Show dock for urgent notifications');
@@ -67,14 +69,14 @@ export default class DockPreferences extends ExtensionPreferences {
 
         const reset = new Gtk.Button({label: 'Reset to defaults', valign: Gtk.Align.CENTER});
         reset.connect('clicked', () => {
-            for (const key of ['autohide', 'autohide-in-fullscreen', 'show-dock-urgent-notify',
-                'animation-time', 'show-delay', 'hide-delay'])
+            for (const key of ['intellihide-all-windows', 'autohide', 'autohide-in-fullscreen',
+                'show-dock-urgent-notify', 'animation-time', 'show-delay', 'hide-delay'])
                 settings.reset(key);
         });
         const resetRow = new Adw.ActionRow();
         resetRow.add_suffix(reset);
 
-        for (const option of [autohide, fullscreen, urgent, animation, hideTimeout, showTimeout, resetRow])
+        for (const option of [allWindows, autohide, fullscreen, urgent, animation, hideTimeout, showTimeout, resetRow])
             row.add_row(option);
         return row;
     }

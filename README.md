@@ -12,7 +12,7 @@ GNOME Shell extension (GNOME 48) that moves the dash out of the overview into a 
 | Isolate monitors | Each dock shows only the applications with windows on its monitor |
 | Position on screen | Left, bottom, top or right |
 | Distance from screen edge | Gap in pixels between the dock and its screen edge; 0 puts it against the edge |
-| Intelligent autohide | On unless the dock is fixed. The dock hides when a window of the focused application touches it. With Show on mouse hover on, it shows when the pointer rests on the screen edge, also in fullscreen and for urgent windows if enabled, with its own animation, show and hide timeouts |
+| Intelligent autohide | On unless the dock is fixed. The dock hides when a window of the focused application touches it, or any window with Hide for every window on. With Show on mouse hover on, it shows when the pointer rests on the screen edge, also in fullscreen and for urgent windows if enabled, with its own animation, show and hide timeouts |
 
 Pinned and running applications of every workspace are always shown. Unless extended, the dock takes up to 90% of the screen edge; icons are 64 px (GNOME's own size) and the ones that don't fit are reached by scrolling over the dock.
 
