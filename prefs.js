@@ -89,6 +89,8 @@ export default class DockPreferences extends ExtensionPreferences {
         const centerIcons = switchRow(settings, 'always-center-icons', 'Centralize icons');
         settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
         group.add(centerIcons);
+        group.add(switchRow(settings, 'quick-settings-border', 'Border',
+            'A 1px border in the color of the Quick Settings menu’s border.'));
         group.add(switchRow(settings, 'running-indicator-dominant-color', 'Colored indicator dots'));
         group.add(switchRow(settings, 'overview-zoom', 'Seamless overview zoom'));
         return group;

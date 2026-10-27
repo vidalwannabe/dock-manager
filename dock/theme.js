@@ -114,6 +114,12 @@ export class ThemeManager {
             this._actor.add_style_class_name('straight-corner');
         else
             this._actor.remove_style_class_name('straight-corner');
+
+        // The border's color is the stylesheet's, so other extensions can restyle it.
+        if (settings.quickSettingsBorder)
+            this._actor.add_style_class_name('quick-settings-border');
+        else
+            this._actor.remove_style_class_name('quick-settings-border');
     }
 
     updateCustomTheme() {
@@ -145,7 +151,9 @@ export class ThemeManager {
         // corner, also removing bottom border and bottom-right corner styles
         let borderMissingStyle = '';
 
-        if (position !== St.Side.LEFT) {
+        // The Quick Settings border already goes all around, and an inline copy would keep
+        // other extensions from restyling its left side.
+        if (position !== St.Side.LEFT && !settings.quickSettingsBorder) {
             borderMissingStyle = `border-left: ${borderWidth}px solid ${
                 borderColor.to_string()};`;
         }
@@ -163,6 +171,7 @@ export class ThemeManager {
         const keys = [
             'extend-height',
             'screen-edge-distance',
+            'quick-settings-border',
         ];
 
         this._signalsHandler.addWithLabel(Labels.THEME_CHANGED, ...keys.map(key => [

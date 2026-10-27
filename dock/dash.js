@@ -231,18 +231,17 @@ export const DockDash = GObject.registerClass({
 
         this._background = new St.Widget({
             style_class: 'dash-background',
-            y_expand: this._isHorizontal,
-            x_expand: !this._isHorizontal,
+            x_expand: true,
+            y_expand: true,
         });
 
+        // The background takes the icons' thickness from Show Applications; along the dock,
+        // it stretches to the icons' length, so its border and padding fit inside that length
+        // and keep the same gap to the icons at both ends as on the sides.
         const sizerBox = new Clutter.Actor();
         sizerBox.add_constraint(new Clutter.BindConstraint({
-            source: this._isHorizontal ? this._showAppsIcon.icon : this._dashContainer,
-            coordinate: Clutter.BindCoordinate.HEIGHT,
-        }));
-        sizerBox.add_constraint(new Clutter.BindConstraint({
-            source: this._isHorizontal ? this._dashContainer : this._showAppsIcon.icon,
-            coordinate: Clutter.BindCoordinate.WIDTH,
+            source: this._showAppsIcon.icon,
+            coordinate: this._isHorizontal ? Clutter.BindCoordinate.HEIGHT : Clutter.BindCoordinate.WIDTH,
         }));
         this._background.add_child(sizerBox);
 
