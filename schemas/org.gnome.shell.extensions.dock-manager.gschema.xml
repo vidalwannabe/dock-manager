@@ -14,6 +14,12 @@
       <summary>Dock position</summary>
       <description>Dock is shown on the Left, Right, Top or Bottom side of the screen.</description>
     </key>
+    <key type="i" name="screen-edge-distance">
+      <range min="0" max="200"/>
+      <default>4</default>
+      <summary>Distance from the screen edge</summary>
+      <description>Gap in pixels between the dock and the screen edge it sits on. 0 puts the dock against the edge.</description>
+    </key>
     <key type="d" name="animation-time">
       <default>0.2</default>
       <summary>Animation time</summary>

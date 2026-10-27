@@ -157,12 +157,18 @@ export class ThemeManager {
 
         if (borderMissingStyle)
             this._dash._background.set_style(borderMissingStyle);
+
+        // The gap to the screen edge goes on the whole dash, so its background and icons
+        // move together: on the background alone, the icons would stay behind.
+        this._dash.set_style(`margin-${PositionStyleClass[position]}: ${
+            settings.screenEdgeDistance}px;`);
     }
 
     _bindSettingsChanges() {
         const keys = [
             'extend-height',
             'transparent-background',
+            'screen-edge-distance',
         ];
 
         this._signalsHandler.addWithLabel(Labels.THEME_CHANGED, ...keys.map(key => [

@@ -11,7 +11,7 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 export default class DockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('org.gnome.shell.extensions.dock-manager');
-        window.set_default_size(600, 760);
+        window.set_default_size(600, 815);
 
         const page = new Adw.PreferencesPage();
         page.add(this._positionGroup(settings));
@@ -41,6 +41,7 @@ export default class DockPreferences extends ExtensionPreferences {
         syncIsolation();
         group.add(isolateRow);
         group.add(positionChoice(settings));
+        group.add(spinRow(settings, 'screen-edge-distance', 'Distance from screen edge (px)', 0, 200, 1, 0));
         group.add(this._autohideRow(settings));
         return group;
     }

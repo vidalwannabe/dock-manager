@@ -27,22 +27,6 @@
   spacing: 6px;
 }
 
-#dockManagerContainer.bottom #dash .dash-background {
-  margin-bottom: 4px;
-}
-
-#dockManagerContainer.top #dash .dash-background {
-  margin-top: 4px;
-}
-
-#dockManagerContainer.left #dash .dash-background {
-  margin-left: 4px;
-}
-
-#dockManagerContainer.right #dash .dash-background {
-  margin-right: 4px;
-}
-
 #dockManagerContainer.horizontal #dash .dash-separator,
 #dockManagerContainer.vertical #dash .dash-separator {
   margin: 4px;
@@ -135,31 +119,17 @@
   margin-bottom: 0;
 }
 
-#dockManagerContainer.bottom #dash .dash-item-container .app-well-app,
-#dockManagerContainer.bottom #dash .dash-item-container .show-apps,
-#dockManagerContainer.bottom #dash .dash-item-container .overview-tile {
+#dockManagerContainer.horizontal #dash .dash-item-container .app-well-app,
+#dockManagerContainer.horizontal #dash .dash-item-container .show-apps,
+#dockManagerContainer.horizontal #dash .dash-item-container .overview-tile {
   padding-top: 10px;
-  padding-bottom: 14px;
-}
-
-#dockManagerContainer.top #dash .dash-item-container .app-well-app,
-#dockManagerContainer.top #dash .dash-item-container .show-apps,
-#dockManagerContainer.top #dash .dash-item-container .overview-tile {
-  padding-top: 14px;
   padding-bottom: 10px;
 }
 
-#dockManagerContainer.left #dash .dash-item-container .app-well-app,
-#dockManagerContainer.left #dash .dash-item-container .show-apps,
-#dockManagerContainer.left #dash .dash-item-container .overview-tile {
+#dockManagerContainer.vertical #dash .dash-item-container .app-well-app,
+#dockManagerContainer.vertical #dash .dash-item-container .show-apps,
+#dockManagerContainer.vertical #dash .dash-item-container .overview-tile {
   padding-right: 10px;
-  padding-left: 14px;
-}
-
-#dockManagerContainer.right #dash .dash-item-container .app-well-app,
-#dockManagerContainer.right #dash .dash-item-container .show-apps,
-#dockManagerContainer.right #dash .dash-item-container .overview-tile {
-  padding-right: 14px;
   padding-left: 10px;
 }
 
@@ -220,22 +190,26 @@
 }
 
 #dockManagerContainer.bottom.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.bottom.fixed #dash .dash-item-container .show-apps {
+#dockManagerContainer.bottom.fixed #dash .dash-item-container .show-apps,
+#dockManagerContainer.bottom.fixed #dash .dash-item-container .overview-tile {
   padding-top: 14px;
 }
 
 #dockManagerContainer.top.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.top.fixed #dash .dash-item-container .show-apps {
+#dockManagerContainer.top.fixed #dash .dash-item-container .show-apps,
+#dockManagerContainer.top.fixed #dash .dash-item-container .overview-tile {
   padding-bottom: 14px;
 }
 
 #dockManagerContainer.left.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.left.fixed #dash .dash-item-container .show-apps {
+#dockManagerContainer.left.fixed #dash .dash-item-container .show-apps,
+#dockManagerContainer.left.fixed #dash .dash-item-container .overview-tile {
   padding-right: 14px;
 }
 
 #dockManagerContainer.right.fixed #dash .dash-item-container .app-well-app,
-#dockManagerContainer.right.fixed #dash .dash-item-container .show-apps {
+#dockManagerContainer.right.fixed #dash .dash-item-container .show-apps,
+#dockManagerContainer.right.fixed #dash .dash-item-container .overview-tile {
   padding-left: 14px;
 }
 
