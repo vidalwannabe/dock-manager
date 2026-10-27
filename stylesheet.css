@@ -346,9 +346,3 @@
 #dockManagerContainer.straight-corner #dash .dash-background {
   border-radius: 0;
 }
-
-#dockManagerContainer.transparent-background #dash .dash-background {
-  background-color: transparent;
-  border-color: transparent;
-  box-shadow: none;
-}

@@ -114,11 +114,6 @@ export class ThemeManager {
             this._actor.add_style_class_name('straight-corner');
         else
             this._actor.remove_style_class_name('straight-corner');
-
-        if (settings.transparentBackground)
-            this._actor.add_style_class_name('transparent-background');
-        else
-            this._actor.remove_style_class_name('transparent-background');
     }
 
     updateCustomTheme() {
@@ -167,7 +162,6 @@ export class ThemeManager {
     _bindSettingsChanges() {
         const keys = [
             'extend-height',
-            'transparent-background',
             'screen-edge-distance',
         ];
 

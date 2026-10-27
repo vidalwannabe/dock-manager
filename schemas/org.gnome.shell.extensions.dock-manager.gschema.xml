@@ -93,10 +93,5 @@
       <summary>Seamless overview zoom</summary>
       <description>Zoom the whole desktop in and out of the overview, including the strips behind the top bar and a fixed dock.</description>
     </key>
-    <key name="transparent-background" type="b">
-      <default>false</default>
-      <summary>Transparent dash background</summary>
-      <description>Show the dock without its background.</description>
-    </key>
   </schema>
 </schemalist>

@@ -11,6 +11,7 @@ GNOME Shell extension (GNOME 48) that moves the dash out of the overview into a 
 | Show the dock on / Show on all monitors | The monitor the dock is on, or one dock per monitor |
 | Isolate monitors | Each dock shows only the applications with windows on its monitor |
 | Position on screen | Left, bottom, top or right |
+| Distance from screen edge | Gap in pixels between the dock and its screen edge; 0 puts it against the edge |
 | Intelligent autohide | On unless the dock is fixed. The dock hides when a window of the focused application touches it. With Show on mouse hover on, it shows when the pointer rests on the screen edge, also in fullscreen and for urgent windows if enabled, with its own animation, show and hide timeouts |
 
 Pinned and running applications of every workspace are always shown. Unless extended, the dock takes up to 90% of the screen edge; icons are 64 px (GNOME's own size) and the ones that don't fit are reached by scrolling over the dock.
@@ -21,7 +22,6 @@ Pinned and running applications of every workspace are always shown. Unless exte
 | --- | --- |
 | Extended dock | The dock spans the whole screen edge, with straight corners |
 | Centralize icons | With Extended dock, the icons sit in the middle of the edge |
-| Transparent background | The dock without its background |
 | Colored indicator dots | One dot per window (up to four), in the icon's dominant color instead of the dot's |
 | Seamless overview zoom | The whole desktop zooms in and out of the overview, including the strips behind the top bar and a fixed dock, which GNOME leaves out. Based on [Overview Seamless Zoom](https://gitlab.com/jguece/overview-seamless-zoom) by jguece, as Kiwi is not Apple also does |
 
