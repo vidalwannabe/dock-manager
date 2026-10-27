@@ -74,6 +74,12 @@
       <default>false</default>
       <summary>Extend the dock container to all the available height/width</summary>
     </key>
+    <key type="i" name="extended-screen-edge-distance">
+      <range min="0" max="200"/>
+      <default>0</default>
+      <summary>Distance from the screen edge of the extended dock</summary>
+      <description>Gap in pixels between the extended dock and the screen edge it sits on. 0 puts the dock against the edge.</description>
+    </key>
     <key type="b" name="always-center-icons">
       <default>false</default>
       <summary>Center icons when dock container is extended to all the available size</summary>

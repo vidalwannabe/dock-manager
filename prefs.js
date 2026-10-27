@@ -11,7 +11,7 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 export default class DockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('org.gnome.shell.extensions.dock-manager');
-        window.set_default_size(600, 815);
+        window.set_default_size(600, 760);
 
         const page = new Adw.PreferencesPage();
         page.add(this._positionGroup(settings));
@@ -83,12 +83,22 @@ export default class DockPreferences extends ExtensionPreferences {
 
     // ---------- Appearance ----------
 
+    // Extended dock, with the options that only apply to it inside.
+    _extendedRow(settings) {
+        const row = new Adw.ExpanderRow({
+            title: 'Extended dock',
+            show_enable_switch: true,
+        });
+        settings.bind('extend-height', row, 'enable-expansion', Gio.SettingsBindFlags.DEFAULT);
+        row.add_row(switchRow(settings, 'always-center-icons', 'Centralize icons'));
+        row.add_row(spinRow(settings, 'extended-screen-edge-distance',
+            'Distance from screen edge (px)', 0, 200, 1, 0));
+        return row;
+    }
+
     _appearanceGroup(settings) {
         const group = new Adw.PreferencesGroup({title: 'Appearance'});
-        group.add(switchRow(settings, 'extend-height', 'Extended dock'));
-        const centerIcons = switchRow(settings, 'always-center-icons', 'Centralize icons');
-        settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
-        group.add(centerIcons);
+        group.add(this._extendedRow(settings));
         group.add(switchRow(settings, 'quick-settings-border', 'Border'));
         group.add(switchRow(settings, 'running-indicator-dominant-color', 'Colored indicator dots'));
         group.add(switchRow(settings, 'overview-zoom', 'Seamless overview zoom'));

@@ -163,14 +163,17 @@ export class ThemeManager {
 
         // The gap to the screen edge goes on the whole dash, so its background and icons
         // move together: on the background alone, the icons would stay behind.
-        this._dash.set_style(`margin-${PositionStyleClass[position]}: ${
-            settings.screenEdgeDistance}px;`);
+        // The extended dock has a distance of its own.
+        const distance = settings.dockExtended
+            ? settings.extendedScreenEdgeDistance : settings.screenEdgeDistance;
+        this._dash.set_style(`margin-${PositionStyleClass[position]}: ${distance}px;`);
     }
 
     _bindSettingsChanges() {
         const keys = [
             'extend-height',
             'screen-edge-distance',
+            'extended-screen-edge-distance',
             'quick-settings-border',
         ];
 
