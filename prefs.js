@@ -11,7 +11,7 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 export default class DockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('org.gnome.shell.extensions.dock-manager');
-        window.set_default_size(600, 760);
+        window.set_default_size(600, 815);
 
         const page = new Adw.PreferencesPage();
         page.add(this._positionGroup(settings));
@@ -89,8 +89,7 @@ export default class DockPreferences extends ExtensionPreferences {
         const centerIcons = switchRow(settings, 'always-center-icons', 'Centralize icons');
         settings.bind('extend-height', centerIcons, 'sensitive', Gio.SettingsBindFlags.GET);
         group.add(centerIcons);
-        group.add(switchRow(settings, 'quick-settings-border', 'Border',
-            'A 1px border in the color of the Quick Settings menu’s border.'));
+        group.add(switchRow(settings, 'quick-settings-border', 'Border'));
         group.add(switchRow(settings, 'running-indicator-dominant-color', 'Colored indicator dots'));
         group.add(switchRow(settings, 'overview-zoom', 'Seamless overview zoom'));
         return group;
