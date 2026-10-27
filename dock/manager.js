@@ -6,8 +6,9 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Panel from 'resource:///org/gnome/shell/ui/panel.js';
 
-import {GlobalSignalsHandler} from '../handlers.js';
+import {GlobalSignalsHandler, PropertyInjectionsHandler, VFuncInjectionsHandler} from '../handlers.js';
 import {DockedDash, STARTUP_ANIMATION_TIME} from './dockedDash.js';
 import {MonitorIsolation} from './monitorIsolation.js';
 import {OverviewIntegration} from './overview.js';
@@ -35,6 +36,8 @@ export class DockManager {
         this._overview = new OverviewIntegration(this);
         this._overviewZoom = new OverviewZoom();
         this._windowTracker = Shell.WindowTracker.get_default();
+        this._vfuncInjections = new VFuncInjectionsHandler();
+        this._centerPanelOnMonitor();
 
         // Connect relevant signals to the toggling function
         this._bindSettingsChanges();
@@ -303,6 +306,26 @@ export class DockManager {
         });
     }
 
+    // GNOME centers the top bar's clock on the work area, so a fixed dock, which takes a strip
+    // of it on the left or right, pushes the clock off the monitor's center. While the top bar
+    // lays itself out, the work area is the whole monitor.
+    _centerPanelOnMonitor() {
+        this._vfuncInjections.add(Panel.Panel.prototype, 'allocate', function (box) {
+            /* eslint-disable no-invalid-this */
+            const {layoutManager} = Main;
+            const propertyInjections = new PropertyInjectionsHandler();
+            propertyInjections.add(layoutManager, 'getWorkAreaForMonitor',
+                {value: index => layoutManager.monitors[index]});
+            try {
+                this.vfunc_allocate(box);
+            } finally {
+                propertyInjections.destroy();
+            }
+            /* eslint-enable no-invalid-this */
+        });
+        Main.panel.queue_relayout();
+    }
+
     _deleteDocks() {
         // Remove extra features
         this._monitorIsolation?.destroy();
@@ -323,6 +346,9 @@ export class DockManager {
         this._overviewZoom = null;
         this._overview.destroy();
         this._overview = null;
+        this._vfuncInjections.destroy();
+        this._vfuncInjections = null;
+        Main.panel.queue_relayout();
         this._deleteDocks();
         this._iconTheme = null;
         this._settings = null;
