@@ -11,7 +11,7 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 export default class DockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('org.gnome.shell.extensions.dock-manager');
-        window.set_default_size(600, 760);
+        window.set_default_size(600, 705);
 
         const page = new Adw.PreferencesPage();
         page.add(this._positionGroup(settings));
@@ -99,7 +99,6 @@ export default class DockPreferences extends ExtensionPreferences {
     _appearanceGroup(settings) {
         const group = new Adw.PreferencesGroup({title: 'Appearance'});
         group.add(this._extendedRow(settings));
-        group.add(switchRow(settings, 'quick-settings-border', 'Border'));
         group.add(switchRow(settings, 'running-indicator-dominant-color', 'Colored indicator dots'));
         group.add(switchRow(settings, 'overview-zoom', 'Seamless overview zoom'));
         return group;

@@ -104,10 +104,5 @@
       <summary>Seamless overview zoom</summary>
       <description>Zoom the whole desktop in and out of the overview, including the strips behind the top bar and a fixed dock.</description>
     </key>
-    <key name="quick-settings-border" type="b">
-      <default>true</default>
-      <summary>Quick Settings border</summary>
-      <description>Draw a 1px border around the dock in the color of the Quick Settings menu's border.</description>
-    </key>
   </schema>
 </schemalist>

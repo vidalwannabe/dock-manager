@@ -22,8 +22,8 @@ export const PositionStyleClass = Object.freeze([
 ]);
 
 /**
- * Keeps the dock's style classes up to date. The dock has no colors of its own: it shows
- * GNOME's style, with the dash's border copied to the side it is missing.
+ * Keeps the dock's style classes up to date. The dock has no colors or borders of its own:
+ * it shows GNOME's style, and whatever other extensions add to it.
  */
 export class ThemeManager {
     constructor(dock) {
@@ -114,12 +114,6 @@ export class ThemeManager {
             this._actor.add_style_class_name('straight-corner');
         else
             this._actor.remove_style_class_name('straight-corner');
-
-        // The border's color is the stylesheet's, so other extensions can restyle it.
-        if (settings.quickSettingsBorder)
-            this._actor.add_style_class_name('quick-settings-border');
-        else
-            this._actor.remove_style_class_name('quick-settings-border');
     }
 
     updateCustomTheme() {
@@ -131,35 +125,10 @@ export class ThemeManager {
         this.emit('updated');
     }
 
-    /**
-     * Reimported back and adapted from atomdock
-     */
+    // Puts the dock at its distance from the screen edge.
     _adjustTheme() {
         const {settings} = DockManager;
-
-        // Remove prior style edits
-        this._dash._background.set_style(null);
-
-        const position = DockManager.settings.dockPosition;
-
-        // obtain theme border settings
-        const themeNode = this._dash._background.get_theme_node();
-        const borderColor = themeNode.get_border_color(St.Side.TOP);
-        const borderWidth = themeNode.get_border_width(St.Side.TOP);
-
-        // We're copying border and corner styles to left border and top-left
-        // corner, also removing bottom border and bottom-right corner styles
-        let borderMissingStyle = '';
-
-        // The Quick Settings border already goes all around, and an inline copy would keep
-        // other extensions from restyling its left side.
-        if (position !== St.Side.LEFT && !settings.quickSettingsBorder) {
-            borderMissingStyle = `border-left: ${borderWidth}px solid ${
-                borderColor.to_string()};`;
-        }
-
-        if (borderMissingStyle)
-            this._dash._background.set_style(borderMissingStyle);
+        const position = settings.dockPosition;
 
         // The gap to the screen edge goes on the whole dash, so its background and icons
         // move together: on the background alone, the icons would stay behind.
@@ -174,7 +143,6 @@ export class ThemeManager {
             'extend-height',
             'screen-edge-distance',
             'extended-screen-edge-distance',
-            'quick-settings-border',
         ];
 
         this._signalsHandler.addWithLabel(Labels.THEME_CHANGED, ...keys.map(key => [
